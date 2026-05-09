@@ -17,13 +17,19 @@ app.use(
     logger,
     serializers: {
       req(req) {
-        return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
+        return {
+          id: req.id,
+          method: req.method,
+          url: req.url?.split("?")[0],
+        };
       },
       res(res) {
-        return { statusCode: res.statusCode };
+        return {
+          statusCode: res.statusCode,
+        };
       },
     },
-  }),
+  })
 );
 
 const allowedOrigins = [
@@ -51,19 +57,17 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      return callback(null, false);
     },
     credentials: true,
-    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "X-Requested-With", "Authorization"],
-  }),
+  })
 );
 
-app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionSecret = process.env.SESSION_SECRET;
+
 if (!sessionSecret) {
   throw new Error("SESSION_SECRET is required");
 }
@@ -72,7 +76,11 @@ const isProduction = process.env.NODE_ENV === "production";
 
 app.use(
   session({
-    store: new PgStore({ pool, createTableIfMissing: true, tableName: "user_sessions" }),
+    store: new PgStore({
+      pool,
+      createTableIfMissing: true,
+      tableName: "user_sessions",
+    }),
     name: "explorisity.sid",
     secret: sessionSecret,
     resave: false,
@@ -84,16 +92,28 @@ app.use(
       secure: isProduction,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     },
-  }),
+  })
 );
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 app.use("/api", (req, res, next) => {
   if (SAFE_METHODS.has(req.method)) return next();
+
   if (req.get("X-Requested-With") !== "explorisity") {
-    return res.status(403).json({ error: "Missing CSRF header" });
+    return res.status(403).json({
+      error: "Missing CSRF header",
+    });
   }
+
   next();
+});
+
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "Explorisity API",
+  });
 });
 
 app.use("/api", router);

@@ -38,9 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await api.logout();
-    qc.setQueryData(["auth", "me"], null);
-    qc.invalidateQueries({ queryKey: ["follows"] });
+    try {
+      await api.logout();
+    } finally {
+      qc.setQueryData(["auth", "me"], null);
+      qc.setQueryData(["follows"], []);
+      qc.removeQueries({ queryKey: ["social-users"] });
+      qc.removeQueries({ queryKey: ["user-follows"] });
+      qc.removeQueries({ queryKey: ["social-communities"] });
+      qc.removeQueries({ queryKey: ["social-posts"] });
+      qc.removeQueries({ queryKey: ["conversations"] });
+    }
   }, [qc]);
 
   // Lock scroll + escape to close
@@ -71,7 +79,10 @@ function SignInModal({ mode, setMode, onClose }: { mode: SignInMode; setMode: (m
 
   const onSuccess = (user: ApiUser) => {
     qc.setQueryData(["auth", "me"], user);
+    qc.setQueryData(["follows"], []);
     qc.invalidateQueries({ queryKey: ["follows"] });
+    qc.invalidateQueries({ queryKey: ["social-users"] });
+    qc.invalidateQueries({ queryKey: ["user-follows"] });
     onClose();
     navigate("/profile");
   };
@@ -89,14 +100,23 @@ function SignInModal({ mode, setMode, onClose }: { mode: SignInMode; setMode: (m
 
   const submit = () => {
     setErr(null);
-    if (!username.trim() || password.length < 8) {
-      setErr("Username required, password must be 8+ characters.");
+    const cleanUsername = username.trim();
+    if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(cleanUsername)) {
+      setErr("Username must be 3–32 characters and use only letters, numbers, dot, dash, or underscore.");
+      return;
+    }
+    if (mode === "signup" && password.length < 8) {
+      setErr("Password must be at least 8 characters.");
+      return;
+    }
+    if (mode === "signin" && !password) {
+      setErr("Password is required.");
       return;
     }
     if (mode === "signup") {
-      signup.mutate({ username: username.trim(), password, displayName: displayName.trim() || undefined });
+      signup.mutate({ username: cleanUsername, password, displayName: displayName.trim() || undefined });
     } else {
-      login.mutate({ username: username.trim(), password });
+      login.mutate({ username: cleanUsername, password });
     }
   };
 

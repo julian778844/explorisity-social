@@ -42,6 +42,24 @@ router.get("/users", requireAuth, async (req, res) => {
   res.json({ users: rows.map(toPublicUser) });
 });
 
+router.get("/users/:id", async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    res.status(400).json({ error: "Invalid user" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const posts = await db.select().from(postsTable).where(eq(postsTable.authorId, userId)).orderBy(desc(postsTable.createdAt)).limit(50);
+  res.json({
+    user: toPublicUser(user),
+    posts: posts.map((p) => ({ ...p, createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString() })),
+  });
+});
+
 router.post("/users/:id/follow", requireAuth, async (req, res) => {
   const targetId = Number(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0 || targetId === req.session.userId) {

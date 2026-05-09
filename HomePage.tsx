@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, Zap, TrendingUp, Award, Users } from "lucide-react";
+import { ArrowRight, Zap, TrendingUp, Award, Users, Search, Sparkles, ShieldCheck } from "lucide-react";
 import { universities } from "@/data/universities";
 import { trendingMatchups } from "@/data/matchups";
 import MatchupCard from "@/components/MatchupCard";
 import UniversitySelector from "@/components/UniversitySelector";
+import GlobalSearch from "@/components/GlobalSearch";
 
 export default function HomePage() {
   const stats = [
@@ -18,9 +19,11 @@ export default function HomePage() {
   const [uniA, setUniA] = useState("");
   const [uniB, setUniB] = useState("");
 
+  const canCompare = Boolean(uniA && uniB && uniA !== uniB);
+
   const handleCompare = () => {
-    if (uniA && uniB) {
-      navigate(`/compare?a=${uniA}&b=${uniB}`);
+    if (canCompare) {
+      navigate(`/compare?a=${encodeURIComponent(uniA)}&b=${encodeURIComponent(uniB)}`);
     }
   };
 
@@ -63,9 +66,11 @@ export default function HomePage() {
             </span>
           </h1>
 
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 leading-relaxed">
             Data-driven university comparisons — tuition, career outcomes, research prestige, and student satisfaction. No fluff.
           </p>
+
+          <GlobalSearch hero className="max-w-3xl mx-auto mb-6" />
 
           <div className="bg-card border border-border rounded-2xl p-6 max-w-2xl mx-auto mb-6">
             <p className="text-sm text-muted-foreground mb-4 uppercase tracking-widest font-medium">Quick Compare</p>
@@ -79,7 +84,7 @@ export default function HomePage() {
               </div>
               <button
                 onClick={handleCompare}
-                disabled={!uniA || !uniB}
+                disabled={!canCompare}
                 className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground font-semibold text-sm transition-all duration-200 whitespace-nowrap"
               >
                 Compare <ArrowRight className="w-4 h-4" />
@@ -170,9 +175,30 @@ export default function HomePage() {
           <div className="relative z-10">
             <h2 className="text-4xl font-black mb-4">Not sure where to start?</h2>
             <p className="text-muted-foreground mb-8 max-w-lg mx-auto">Let our AI analyze your profile and recommend the schools most likely to result in success — on your terms.</p>
-            <Link href="/ai-picks" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all shadow-lg shadow-primary/30">
-              Get AI Picks <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link href="/ai-picks" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all shadow-lg shadow-primary/30">
+                Get AI Picks <Sparkles className="w-4 h-4" />
+              </Link>
+              <Link href="/rankings" className="inline-flex items-center gap-2 px-8 py-3 rounded-xl border border-border bg-background/70 hover:bg-muted font-semibold transition-all">
+                Browse rankings <Search className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+              {[
+                { icon: ShieldCheck, title: "Outcome-first", text: "Compare graduation, salary, employment, and value side by side." },
+                { icon: Users, title: "Student signal", text: "Use votes and social activity to see what students actually debate." },
+                { icon: Award, title: "Fit beyond rank", text: "Balance prestige with campus life, diversity, affordability, and goals." },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.title} className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                    <Icon className="w-4 h-4 text-primary mb-2" />
+                    <div className="font-bold text-sm">{item.title}</div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.text}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>

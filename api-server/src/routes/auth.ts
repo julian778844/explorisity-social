@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, usersTable, toPublicUser } from "@workspace/db";
@@ -6,6 +6,21 @@ import { signupSchema, loginSchema, updateProfileSchema } from "@workspace/api-z
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
+
+function saveSession(req: Request): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.save((err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function destroySession(req: Request): Promise<void> {
+  return new Promise((resolve) => {
+    req.session.destroy(() => resolve());
+  });
+}
 
 router.post("/signup", async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
@@ -27,6 +42,7 @@ router.post("/signup", async (req, res) => {
       .returning();
     if (!created) throw new Error("Insert failed");
     req.session.userId = created.id;
+    await saveSession(req);
     return res.status(201).json({ user: toPublicUser(created) });
   } catch (err) {
     req.log.error({ err }, "signup failed");
@@ -46,6 +62,7 @@ router.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "Invalid username or password" });
     req.session.userId = user.id;
+    await saveSession(req);
     return res.json({ user: toPublicUser(user) });
   } catch (err) {
     req.log.error({ err }, "login failed");
@@ -53,18 +70,17 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie("explorisity.sid");
-    res.json({ ok: true });
-  });
+router.post("/logout", async (req, res) => {
+  await destroySession(req);
+  res.clearCookie("explorisity.sid", { path: "/" });
+  res.json({ ok: true });
 });
 
 router.get("/me", async (req, res) => {
   if (!req.session?.userId) return res.json({ user: null });
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1);
   if (!user) {
-    req.session.destroy(() => {});
+    await destroySession(req);
     return res.json({ user: null });
   }
   return res.json({ user: toPublicUser(user) });

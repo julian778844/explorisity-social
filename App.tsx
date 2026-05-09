@@ -41,6 +41,7 @@ function Router() {
       <Route path="/school/:type/:id" component={SchoolProfilePage} />
       <Route path="/ai-picks" component={AiPicksPage} />
       <Route path="/contact" component={ContactPage} />
+      <Route path="/profile/:id" component={ProfilePage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/social" component={SocialPage} />

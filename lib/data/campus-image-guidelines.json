@@ -1,0 +1,23 @@
+{
+  "preferred_image_types": [
+    "drone shot",
+    "aerial campus overview",
+    "wide quad photo",
+    "main campus lawn",
+    "library exterior wide shot",
+    "iconic academic building",
+    "campus skyline",
+    "student commons wide shot"
+  ],
+  "avoid_image_types": [
+    "door closeups",
+    "single residence hall door",
+    "hallway",
+    "bathroom",
+    "bedroom",
+    "parking lot",
+    "sign-only photo",
+    "random building closeup"
+  ],
+  "rule": "School pages and comparisons should prioritize images that immediately communicate the identity and scale of the campus."
+}

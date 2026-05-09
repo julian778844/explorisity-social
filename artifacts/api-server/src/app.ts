@@ -8,7 +8,6 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
-
 const PgStore = connectPgSimple(session);
 
 app.set("trust proxy", 1);
@@ -30,6 +29,7 @@ app.use(
 const allowedOrigins = [
   ...(process.env.CORS_ORIGINS ?? "").split(","),
   process.env.FRONTEND_URL ?? "",
+  "https://explorisity-social.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ]
@@ -51,13 +51,15 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(
-        new Error(`Origin ${origin} is not allowed by CORS`)
-      );
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
     },
     credentials: true,
-  })
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "X-Requested-With", "Authorization"],
+  }),
 );
+
+app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -78,17 +80,13 @@ app.use(
     rolling: true,
     cookie: {
       httpOnly: true,
-      // Cross-domain frontend/backend deployments need SameSite=None and Secure cookies.
       sameSite: isProduction ? "none" : "lax",
       secure: isProduction,
-      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      maxAge: 1000 * 60 * 60 * 24 * 30,
     },
   }),
 );
 
-// CSRF mitigation: require a non-simple custom header on all mutating requests.
-// Browsers cannot send custom headers on cross-origin form submissions without
-// triggering a CORS preflight.
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 app.use("/api", (req, res, next) => {
   if (SAFE_METHODS.has(req.method)) return next();

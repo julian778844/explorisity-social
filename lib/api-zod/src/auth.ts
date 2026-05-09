@@ -11,15 +11,39 @@ export const passwordSchema = z
   .min(8, "Password must be at least 8 characters")
   .max(128);
 
+const optionalEmailSchema = z
+  .string()
+  .trim()
+  .email("Enter a valid email")
+  .max(254)
+  .optional()
+  .or(z.literal(""))
+  .transform((v) => (v === "" ? undefined : v));
+
+const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .max(32)
+  .optional()
+  .or(z.literal(""))
+  .transform((v) => (v === "" ? undefined : v));
+
 export const signupSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
   displayName: z.string().min(1).max(64).optional(),
+  email: optionalEmailSchema,
+  phone: optionalPhoneSchema,
+  emailOptIn: z.boolean().optional().default(true),
+  smsOptIn: z.boolean().optional().default(false),
+  scholarshipAlerts: z.boolean().optional().default(true),
+  jobAlerts: z.boolean().optional().default(true),
+  schoolNewsAlerts: z.boolean().optional().default(true),
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 
 export const loginSchema = z.object({
-  username: usernameSchema,
+  username: z.string().min(1).max(254),
   password: z.string().min(1).max(128),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -36,6 +60,7 @@ export const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(64).optional(),
   bio: z.string().max(500).nullable().optional(),
   email: z.string().email().max(254).nullable().optional(),
+  phone: z.string().max(32).nullable().optional(),
   avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   instagram: socialHandleSchema,
   linkedin: socialHandleSchema,
@@ -43,6 +68,11 @@ export const updateProfileSchema = z.object({
   twitter: socialHandleSchema,
   tiktok: socialHandleSchema,
   youtube: socialHandleSchema,
+  emailOptIn: z.boolean().optional(),
+  smsOptIn: z.boolean().optional(),
+  scholarshipAlerts: z.boolean().optional(),
+  jobAlerts: z.boolean().optional(),
+  schoolNewsAlerts: z.boolean().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 

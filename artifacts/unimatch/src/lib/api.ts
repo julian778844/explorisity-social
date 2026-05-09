@@ -4,6 +4,7 @@ export type ApiUser = {
   displayName: string;
   bio: string | null;
   email: string | null;
+  phone: string | null;
   avatarColor: string;
   instagram: string | null;
   linkedin: string | null;
@@ -11,6 +12,11 @@ export type ApiUser = {
   twitter: string | null;
   tiktok: string | null;
   youtube: string | null;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -25,6 +31,11 @@ export type Community = {
   name: string;
   description: string | null;
   createdById: number | null;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -46,6 +57,11 @@ export type Conversation = {
   name: string | null;
   communityId: number | null;
   createdById: number | null;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -54,12 +70,22 @@ export type Message = {
   conversationId: number;
   senderId: number;
   body: string;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
 export type UserFollow = {
   id: number;
   followingId: number;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -67,6 +93,11 @@ export type FollowItem = {
   id: number;
   schoolType: "undergrad" | "law" | "mba" | "med" | "trade";
   schoolId: string;
+  emailOptIn: boolean;
+  smsOptIn: boolean;
+  scholarshipAlerts: boolean;
+  jobAlerts: boolean;
+  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -102,7 +133,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   me: () => request<{ user: ApiUser | null }>("/auth/me"),
-  signup: (b: { username: string; password: string; displayName?: string }) =>
+  signup: (b: { username: string; password: string; displayName?: string; email?: string; phone?: string; emailOptIn?: boolean; smsOptIn?: boolean; scholarshipAlerts?: boolean; jobAlerts?: boolean; schoolNewsAlerts?: boolean }) =>
     request<{ user: ApiUser }>("/auth/signup", { method: "POST", body: JSON.stringify(b) }),
   login: (b: { username: string; password: string }) =>
     request<{ user: ApiUser }>("/auth/login", { method: "POST", body: JSON.stringify(b) }),
@@ -148,4 +179,6 @@ export const api = {
   listMessages: (conversationId: number) => request<{ messages: Message[] }>(`/social/conversations/${conversationId}/messages`),
   sendMessage: (conversationId: number, body: string) =>
     request<{ message: Message }>(`/social/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
+
+  search: (q: string) => request<{ schools: Array<{ id: string | number; name: string; type: string }>; users: ApiUser[]; communities: Community[] }>(`/search?q=${encodeURIComponent(q)}`),
 };

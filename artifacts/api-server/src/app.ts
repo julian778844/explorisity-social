@@ -60,6 +60,8 @@ app.use(
       return callback(null, false);
     },
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "X-Requested-With", "Authorization"],
   })
 );
 

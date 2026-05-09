@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { universities } from "@/data/universities";
 import { lawSchools } from "@/data/lawSchools";
 import { mbaPrograms } from "@/data/mbaPrograms";
@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import SchoolLogo from "@/components/SchoolLogo";
 import SocialLinks, { SOCIAL_PLATFORMS } from "@/components/SocialLinks";
 import type { SocialPlatform } from "@/lib/api";
-import { Mail, Edit3, Heart, LogIn, Save, X } from "lucide-react";
+import { Mail, Edit3, Heart, LogIn, Save, X, MessageSquare, Briefcase } from "lucide-react";
 
 const AVATAR_COLORS = ["#7C3AED", "#06B6D4", "#EC4899", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#A855F7"];
 
@@ -53,6 +53,14 @@ function resolveFollow(type: SchoolType, id: string): ResolvedSchool | null {
 
 export default function ProfilePage() {
   const { user, openSignIn, isPending, signOut } = useAuth();
+  const [, params] = useRoute("/profile/:id");
+  const profileId = params?.id ? Number(params.id) : null;
+  const isPublicProfile = Number.isInteger(profileId) && profileId !== user?.id;
+  const publicProfile = useQuery({
+    queryKey: ["public-profile", profileId],
+    queryFn: () => api.getPublicProfile(profileId!),
+    enabled: Boolean(isPublicProfile && profileId),
+  });
   const { list: follows, toggle } = useFollows();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -78,6 +86,61 @@ export default function ProfilePage() {
       setEditing(false);
     },
   });
+
+  if (isPublicProfile) {
+    if (publicProfile.isPending) return <div className="min-h-screen px-4 py-20 max-w-md mx-auto text-center text-muted-foreground">Loading profile…</div>;
+    if (!publicProfile.data) return <div className="min-h-screen px-4 py-20 max-w-md mx-auto text-center text-muted-foreground">Profile not found.</div>;
+    const viewed = publicProfile.data.user;
+    const posts = publicProfile.data.posts;
+    return (
+      <div className="min-h-screen px-4 py-10 max-w-5xl mx-auto">
+        <div className="rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-8 mb-8">
+          <div className="flex items-start gap-6 flex-wrap">
+            <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-white text-4xl font-black flex-shrink-0 shadow-xl" style={{ backgroundColor: viewed.avatarColor }}>
+              {viewed.displayName.charAt(0).toUpperCase() || "?"}
+            </div>
+            <div className="flex-1 min-w-[260px]">
+              <h1 className="text-3xl font-black mb-1">{viewed.displayName}</h1>
+              <div className="text-sm text-muted-foreground mb-2">@{viewed.username} · joined {viewed.createdAt.slice(0, 10)}</div>
+              {viewed.bio && <p className="text-foreground mb-3">{viewed.bio}</p>}
+              <SocialLinks user={viewed} size="md" className="mt-3" />
+              <div className="mt-4 flex gap-2 flex-wrap text-xs text-muted-foreground">
+                <span className="rounded-full bg-muted px-3 py-1 font-bold">Student profile</span>
+                <span className="rounded-full bg-muted px-3 py-1 font-bold">Posts: {posts.length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+          <div>
+            <h2 className="text-xl font-black flex items-center gap-2 mb-4"><MessageSquare className="w-5 h-5 text-primary" /> Posts & Experience</h2>
+            {posts.length === 0 ? (
+              <div className="rounded-2xl border border-border/60 bg-card p-8 text-center text-muted-foreground">No public posts yet.</div>
+            ) : (
+              <div className="space-y-3">
+                {posts.map((post) => (
+                  <div key={post.id} className="rounded-2xl border border-border/60 bg-card p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">{post.category}</span>
+                      <span className="text-xs text-muted-foreground">{post.createdAt.slice(0, 10)}</span>
+                    </div>
+                    <h3 className="font-black text-lg">{post.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{post.body}</p>
+                    {post.url && <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-bold text-primary hover:underline">Open link →</a>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <aside className="rounded-2xl border border-border/60 bg-card p-5 h-fit">
+            <h3 className="font-black flex items-center gap-2"><Briefcase className="w-4 h-4 text-primary" /> Experience signal</h3>
+            <p className="text-sm text-muted-foreground mt-2">Use this profile to review the student’s posts, opportunities shared, events, projects, and school community activity.</p>
+          </aside>
+        </div>
+      </div>
+    );
+  }
 
   if (isPending) {
     return <div className="min-h-screen px-4 py-20 max-w-md mx-auto text-center text-muted-foreground">Loading…</div>;

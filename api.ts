@@ -16,6 +16,15 @@ export type ApiUser = {
 
 export type SocialPlatform = "instagram" | "linkedin" | "facebook" | "twitter" | "tiktok" | "youtube";
 
+export type SearchResult = {
+  id: string;
+  type: "user" | "school" | "opportunity";
+  title: string;
+  subtitle: string;
+  href: string;
+  meta?: string;
+};
+
 
 
 export type Community = {
@@ -122,6 +131,8 @@ export const api = {
     request<{ ok: true }>("/follows", { method: "POST", body: JSON.stringify(b) }),
   removeFollow: (type: FollowItem["schoolType"], id: string) =>
     request<{ ok: true }>(`/follows/${type}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  search: (q: string) => request<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(q)}`),
+  getPublicProfile: (id: number) => request<{ user: ApiUser; posts: SocialPost[] }>(`/social/users/${id}`),
   listUsers: () => request<{ users: ApiUser[] }>("/social/users"),
   listUserFollows: () => request<{ follows: UserFollow[] }>("/social/user-follows"),
   followUser: (id: number) => request<{ ok: true }>(`/social/users/${id}/follow`, { method: "POST" }),

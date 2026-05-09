@@ -73,15 +73,22 @@ export type FollowItem = {
 const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/+$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "explorisity",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "explorisity",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new Error("Could not reach the Explorisity server. Check VITE_API_URL in Vercel and CORS_ORIGINS or FRONTEND_URL in Render.");
+  }
+
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
     try {

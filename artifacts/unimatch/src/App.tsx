@@ -21,6 +21,7 @@ import SchoolProfilePage from "@/pages/SchoolProfilePage";
 import ContactPage from "@/pages/ContactPage";
 import ProfilePage from "@/pages/ProfilePage";
 import SocialPage from "@/pages/SocialPage";
+import ChanceMe from "@/pages/ChanceMe";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/profile" component={ProfilePage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/social" component={SocialPage} />
+      <Route path="/chance-me" component={ChanceMe} />
       <Route component={NotFound} />
     </Switch>
   );

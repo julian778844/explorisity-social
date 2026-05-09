@@ -27,16 +27,21 @@ app.use(
   }),
 );
 
-const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:5173,http://localhost:3000")
-  .split(",")
-  .map((origin) => origin.trim())
+const allowedOrigins = [
+  ...(process.env.CORS_ORIGINS ?? "").split(","),
+  process.env.FRONTEND_URL ?? "",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]
+  .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(normalizedOrigin)) return callback(null, true);
       return callback(new Error(`Origin ${origin} is not allowed by CORS`));
     },
     credentials: true,

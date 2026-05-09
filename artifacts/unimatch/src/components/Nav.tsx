@@ -7,7 +7,7 @@ import Logo, { LogoMark, Wordmark } from "@/components/Logo";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", icon: Compass, group: "Browse" },
-  { href: "/compare", label: "University Comparisons", icon: GraduationCap, group: "Browse" },
+  { href: "/compare", label: "Compare schools", icon: GraduationCap, group: "Browse" },
   { href: "/rankings", label: "Undergrad Rankings", icon: GraduationCap, group: "Rankings" },
   { href: "/law", label: "Law School Rankings", icon: Scale, group: "Rankings" },
   { href: "/med", label: "Med School Rankings", icon: Stethoscope, group: "Rankings" },
@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/trade", label: "Trade & Technical", icon: Wrench, group: "Rankings" },
   { href: "/trending", label: "Trending Matchups", icon: Compass, group: "Discover" },
   { href: "/social", label: "Social Communities", icon: Users, group: "Discover" },
+  { href: "/chance-me", label: "Chance Me", icon: Compass, group: "Discover" },
   { href: "/ai-picks", label: "AI Picks", icon: Compass, group: "Discover" },
   { href: "/contact", label: "Contact Us", icon: Mail, group: "About" },
 ];
@@ -79,7 +80,7 @@ export default function Nav() {
                 data-testid="button-signin"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Sign In</span>
+                <span>Sign in to make your profile</span>
               </button>
             )}
           </div>

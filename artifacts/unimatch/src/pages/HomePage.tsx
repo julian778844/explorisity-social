@@ -5,6 +5,7 @@ import { ArrowRight, Award, BarChart3, MessageCircle, Search, Sparkles, Users } 
 import { universities } from "@/data/universities";
 import UniversitySelector from "@/components/UniversitySelector";
 import { useAuth } from "@/lib/auth";
+import AcademicNetworkHero from "@/components/AcademicNetworkHero";
 
 export default function HomePage() {
   const { user, openSignIn } = useAuth();
@@ -49,6 +50,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen px-4 py-8">
+      <div className="mx-auto mb-6 max-w-7xl">
+        <AcademicNetworkHero />
+      </div>
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <motion.div
           initial={{ opacity: 0, y: 18 }}

@@ -1,88 +1,69 @@
-
 export default function AcademicNetworkHero() {
   return (
-    <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-white via-slate-50 to-blue-50 p-6 shadow-sm md:p-8">
-      <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-100 opacity-70 blur-2xl" />
-      <div className="absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-indigo-100 opacity-70 blur-2xl" />
+    <section className="relative overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
+      <div className="absolute inset-0">
+        <img
+          src="https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1800&q=80"
+          alt="University campus overview"
+          className="h-full w-full object-cover opacity-28"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/55" />
+      </div>
 
-      <div className="relative grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center">
+      <div className="relative grid gap-8 p-6 md:grid-cols-[1.1fr_0.9fr] md:p-10 lg:p-12">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.22em] text-blue-700">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-black text-muted-foreground backdrop-blur">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
             Student discovery network
-          </p>
+          </div>
 
-          <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
-            Explore schools. Build your profile. Connect with your future.
+          <h1 className="max-w-4xl text-4xl font-black leading-tight tracking-tight md:text-6xl">
+            Explore schools.
+            <span className="block bg-gradient-to-r from-primary to-[hsl(var(--accent))] bg-clip-text text-transparent">
+              Build your academic network.
+            </span>
           </h1>
 
-          <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-slate-600">
-            Explorisity helps students compare schools, follow communities, discover rankings, share milestones, and find opportunities in one academic network.
+          <p className="mt-5 max-w-2xl text-base font-medium leading-7 text-muted-foreground md:text-lg">
+            Discover universities, internships, scholarships, jobs, events, rankings, and student communities in one place.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <a
-              href="/auth"
-              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800"
-            >
-              Sign in to make your profile
-            </a>
-
-            <a
-              href="/rankings"
-              className="rounded-full border bg-white px-5 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50"
-            >
+          <div className="mt-7 flex flex-wrap gap-3">
+            <a href="/rankings" className="rounded-xl bg-primary px-5 py-3 text-sm font-black text-primary-foreground shadow-sm transition hover:opacity-90">
               Explore rankings
             </a>
-
-            <a
-              href="/social"
-              className="rounded-full border bg-white px-5 py-3 text-sm font-bold text-slate-900 hover:bg-slate-50"
-            >
-              Join student communities
+            <a href="/social" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
+              Join communities
+            </a>
+            <a href="/compare" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
+              Compare schools
             </a>
           </div>
         </div>
 
-        <div className="relative">
-          <div className="rounded-3xl border bg-white/85 p-5 shadow-xl backdrop-blur">
-            <div className="flex items-center gap-3 border-b pb-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl">
-                🎓
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-950">Academic profile</p>
-                <p className="text-xs font-medium text-slate-500">Scores • goals • schools • journey</p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Trending community</p>
-                <p className="mt-1 font-black text-slate-950">Premed students networking</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-blue-50 p-4">
-                  <p className="text-xs font-bold text-blue-700">Rankings</p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">Live</p>
-                </div>
-                <div className="rounded-2xl bg-indigo-50 p-4">
-                  <p className="text-xs font-bold text-indigo-700">Chance Me</p>
-                  <p className="mt-1 text-2xl font-black text-slate-950">Fit</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Student journey</p>
-                <p className="mt-1 text-sm font-semibold text-slate-700">
-                  Accepted • scholarships • internships • events
-                </p>
-              </div>
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
+          <div className="overflow-hidden rounded-3xl border border-border bg-background shadow-lg">
+            <img
+              src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=900&q=80"
+              alt="Students on a university campus"
+              className="h-40 w-full object-cover"
+            />
+            <div className="p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-primary">Student journey</p>
+              <p className="mt-1 text-sm font-bold">Accepted, scholarships, internships, and milestones.</p>
             </div>
           </div>
 
-          <div className="absolute -right-4 -top-4 rounded-2xl border bg-white px-4 py-3 text-sm font-black shadow-lg">
-            🏫 Compare schools
+          <div className="overflow-hidden rounded-3xl border border-border bg-background shadow-lg">
+            <img
+              src="https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=900&q=80"
+              alt="Academic library and campus study space"
+              className="h-40 w-full object-cover"
+            />
+            <div className="p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-primary">Opportunities</p>
+              <p className="mt-1 text-sm font-bold">Schools, jobs, scholarships, events, and networking.</p>
+            </div>
           </div>
         </div>
       </div>

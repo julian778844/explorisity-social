@@ -20,9 +20,12 @@ export type ApiUser = {
   createdAt: string;
 };
 
+export type AuthResponse = {
+  user: ApiUser;
+  authToken?: string;
+};
+
 export type SocialPlatform = "instagram" | "linkedin" | "facebook" | "twitter" | "tiktok" | "youtube";
-
-
 
 export type Community = {
   id: number;
@@ -31,11 +34,6 @@ export type Community = {
   name: string;
   description: string | null;
   createdById: number | null;
-  emailOptIn: boolean;
-  smsOptIn: boolean;
-  scholarshipAlerts: boolean;
-  jobAlerts: boolean;
-  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -57,11 +55,6 @@ export type Conversation = {
   name: string | null;
   communityId: number | null;
   createdById: number | null;
-  emailOptIn: boolean;
-  smsOptIn: boolean;
-  scholarshipAlerts: boolean;
-  jobAlerts: boolean;
-  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -70,22 +63,12 @@ export type Message = {
   conversationId: number;
   senderId: number;
   body: string;
-  emailOptIn: boolean;
-  smsOptIn: boolean;
-  scholarshipAlerts: boolean;
-  jobAlerts: boolean;
-  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
 export type UserFollow = {
   id: number;
   followingId: number;
-  emailOptIn: boolean;
-  smsOptIn: boolean;
-  scholarshipAlerts: boolean;
-  jobAlerts: boolean;
-  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
@@ -93,18 +76,30 @@ export type FollowItem = {
   id: number;
   schoolType: "undergrad" | "law" | "mba" | "med" | "trade";
   schoolId: string;
-  emailOptIn: boolean;
-  smsOptIn: boolean;
-  scholarshipAlerts: boolean;
-  jobAlerts: boolean;
-  schoolNewsAlerts: boolean;
   createdAt: string;
 };
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/+$/, "");
+const AUTH_TOKEN_KEY = "explorisity.authToken";
+
+function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setAuthToken(token?: string | null) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {}
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  const token = getAuthToken();
 
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -113,6 +108,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "explorisity",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -125,19 +121,40 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const j = await res.json();
       if (j && typeof j.error === "string") msg = j.error;
+      if (j && typeof j.message === "string") msg = j.message;
     } catch {}
     throw new Error(msg);
   }
+
   return (await res.json()) as T;
+}
+
+async function authRequest(path: string, body: unknown): Promise<AuthResponse> {
+  const response = await request<AuthResponse>(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  setAuthToken(response.authToken ?? null);
+  return response;
 }
 
 export const api = {
   me: () => request<{ user: ApiUser | null }>("/auth/me"),
   signup: (b: { username: string; password: string; displayName?: string; email?: string; phone?: string; emailOptIn?: boolean; smsOptIn?: boolean; scholarshipAlerts?: boolean; jobAlerts?: boolean; schoolNewsAlerts?: boolean }) =>
-    request<{ user: ApiUser }>("/auth/signup", { method: "POST", body: JSON.stringify(b) }),
-  login: (b: { username: string; password: string }) =>
-    request<{ user: ApiUser }>("/auth/login", { method: "POST", body: JSON.stringify(b) }),
-  logout: () => request<{ ok: true }>("/auth/logout", { method: "POST" }),
+    authRequest("/auth/signup", b),
+  login: (b: { username: string; password: string }) => authRequest("/auth/login", b),
+  logout: async () => {
+    try {
+      return await request<{ ok: true }>("/auth/logout", { method: "POST" });
+    } finally {
+      setAuthToken(null);
+    }
+  },
+  requestPasswordReset: (emailOrUsername: string) =>
+    request<{ ok: boolean; message?: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ emailOrUsername }),
+    }),
   updateProfile: (
     b: Partial<
       Pick<
@@ -145,6 +162,7 @@ export const api = {
         | "displayName"
         | "bio"
         | "email"
+        | "phone"
         | "avatarColor"
         | "instagram"
         | "linkedin"
@@ -152,6 +170,11 @@ export const api = {
         | "twitter"
         | "tiktok"
         | "youtube"
+        | "emailOptIn"
+        | "smsOptIn"
+        | "scholarshipAlerts"
+        | "jobAlerts"
+        | "schoolNewsAlerts"
       >
     >,
   ) => request<{ user: ApiUser }>("/auth/me", { method: "PATCH", body: JSON.stringify(b) }),
@@ -179,6 +202,5 @@ export const api = {
   listMessages: (conversationId: number) => request<{ messages: Message[] }>(`/social/conversations/${conversationId}/messages`),
   sendMessage: (conversationId: number, body: string) =>
     request<{ message: Message }>(`/social/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
-
   search: (q: string) => request<{ schools: Array<{ id: string | number; name: string; type: string }>; users: ApiUser[]; communities: Community[] }>(`/search?q=${encodeURIComponent(q)}`),
 };

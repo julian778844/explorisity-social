@@ -1,0 +1,71 @@
+-- Explorisity complete auth/session/post readiness migration
+
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(32) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  display_name VARCHAR(64) NOT NULL,
+  bio TEXT,
+  email VARCHAR(254),
+  phone VARCHAR(32),
+  avatar_color VARCHAR(7) NOT NULL DEFAULT '#7c3aed',
+  instagram VARCHAR(200),
+  linkedin VARCHAR(200),
+  facebook VARCHAR(200),
+  twitter VARCHAR(200),
+  tiktok VARCHAR(200),
+  youtube VARCHAR(200),
+  email_opt_in BOOLEAN NOT NULL DEFAULT TRUE,
+  sms_opt_in BOOLEAN NOT NULL DEFAULT FALSE,
+  scholarship_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+  job_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+  school_news_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+  last_login_at TIMESTAMP,
+  welcome_seen_at TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(32);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_color VARCHAR(7) NOT NULL DEFAULT '#7c3aed';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS instagram VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS linkedin VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS facebook VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS twitter VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tiktok VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS youtube VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_in BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sms_opt_in BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS scholarship_alerts BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS job_alerts BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS school_news_alerts BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_seen_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+UPDATE users SET display_name = username WHERE display_name IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_idx ON users (username);
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email)) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS users_username_lower_idx ON users (LOWER(username));
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  email_or_username TEXT NOT NULL,
+  token_hash TEXT,
+  expires_at TIMESTAMP,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  sid varchar NOT NULL COLLATE "default",
+  sess json NOT NULL,
+  expire timestamp(6) NOT NULL,
+  CONSTRAINT user_sessions_pkey PRIMARY KEY (sid)
+);
+CREATE INDEX IF NOT EXISTS IDX_user_sessions_expire ON user_sessions (expire);

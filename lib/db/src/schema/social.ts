@@ -55,10 +55,35 @@ export const postsTable = pgTable(
     title: varchar("title", { length: 160 }).notNull(),
     body: text("body").notNull(),
     url: varchar("url", { length: 500 }),
+    imageUrl: text("image_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("posts_community_idx").on(t.communityId), index("posts_author_idx").on(t.authorId), index("posts_category_idx").on(t.category)],
+);
+
+export const postLikesTable = pgTable(
+  "post_likes",
+  {
+    id: serial("id").primaryKey(),
+    postId: integer("post_id").notNull().references(() => postsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("post_likes_uidx").on(t.postId, t.userId), index("post_likes_post_idx").on(t.postId), index("post_likes_user_idx").on(t.userId)],
+);
+
+export const postCommentsTable = pgTable(
+  "post_comments",
+  {
+    id: serial("id").primaryKey(),
+    postId: integer("post_id").notNull().references(() => postsTable.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("post_comments_post_idx").on(t.postId), index("post_comments_user_idx").on(t.userId)],
 );
 
 export const conversationsTable = pgTable(

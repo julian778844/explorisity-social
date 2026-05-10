@@ -3,6 +3,7 @@ import { and, desc, eq, ne, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   db,
+  pool,
   usersTable,
   toPublicUser,
   userFollowsTable,
@@ -18,6 +19,13 @@ import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
+const MAX_IMAGE_DATA_URL_LENGTH = 4_500_000;
+
+function isSafeImageDataUrl(value?: string | null) {
+  if (!value) return true;
+  return /^data:image\/(png|jpe?g|webp);base64,/i.test(value) && value.length <= MAX_IMAGE_DATA_URL_LENGTH;
+}
+
 const communityInputSchema = z.object({
   schoolType: z.string().min(2).max(16),
   schoolId: z.string().min(1).max(80),
@@ -31,15 +39,181 @@ const postInputSchema = z.object({
   title: z.string().min(2).max(160),
   body: z.string().min(1).max(5000),
   url: z.string().url().max(500).optional().nullable(),
+  imageUrl: z.string().max(MAX_IMAGE_DATA_URL_LENGTH).optional().nullable(),
+}).refine((data) => isSafeImageDataUrl(data.imageUrl), {
+  message: "Image must be PNG, JPG, JPEG, or WEBP and under the size limit.",
+  path: ["imageUrl"],
+});
+
+const postUpdateSchema = postInputSchema.partial().refine((data) => isSafeImageDataUrl(data.imageUrl), {
+  message: "Image must be PNG, JPG, JPEG, or WEBP and under the size limit.",
+  path: ["imageUrl"],
 });
 
 const dmInputSchema = z.object({ recipientUserId: z.number().int().positive() });
 const groupInputSchema = z.object({ name: z.string().min(2).max(140), memberIds: z.array(z.number().int().positive()).min(1).max(50) });
 const messageInputSchema = z.object({ body: z.string().min(1).max(5000) });
+const commentInputSchema = z.object({ body: z.string().min(1).max(1000) });
+
+function serializeDate(value: unknown) {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return new Date(value).toISOString();
+  return new Date().toISOString();
+}
+
+function serializePost(row: any) {
+  return {
+    id: Number(row.id),
+    authorId: Number(row.authorId ?? row.author_id),
+    communityId: row.communityId ?? row.community_id ?? null,
+    category: row.category,
+    title: row.title,
+    body: row.body,
+    url: row.url ?? null,
+    imageUrl: row.imageUrl ?? row.image_url ?? null,
+    createdAt: serializeDate(row.createdAt ?? row.created_at),
+    updatedAt: serializeDate(row.updatedAt ?? row.updated_at),
+    author: row.author ?? null,
+    likeCount: Number(row.likeCount ?? 0),
+    commentCount: Number(row.commentCount ?? 0),
+    likedByMe: Boolean(row.likedByMe ?? false),
+  };
+}
+
+async function listPostsWithAuthors(options: { currentUserId?: number | null; authorId?: number; communityId?: number } = {}) {
+  const params: any[] = [options.currentUserId ?? 0];
+  const conditions: string[] = [];
+
+  if (options.authorId) {
+    params.push(options.authorId);
+    conditions.push(`p.author_id = $${params.length}`);
+  }
+
+  if (options.communityId) {
+    params.push(options.communityId);
+    conditions.push(`p.community_id = $${params.length}`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const result = await pool.query(
+    `
+      SELECT
+        p.id,
+        p.author_id AS "authorId",
+        p.community_id AS "communityId",
+        p.category,
+        p.title,
+        p.body,
+        p.url,
+        p.image_url AS "imageUrl",
+        p.created_at AS "createdAt",
+        p.updated_at AS "updatedAt",
+        json_build_object(
+          'id', u.id,
+          'username', u.username,
+          'displayName', u.display_name,
+          'avatarColor', u.avatar_color,
+          'avatarUrl', u.avatar_url
+        ) AS author,
+        COALESCE(l.like_count, 0)::int AS "likeCount",
+        COALESCE(c.comment_count, 0)::int AS "commentCount",
+        EXISTS (
+          SELECT 1 FROM post_likes pl
+          WHERE pl.post_id = p.id AND pl.user_id = $1
+        ) AS "likedByMe"
+      FROM posts p
+      JOIN users u ON u.id = p.author_id
+      LEFT JOIN (
+        SELECT post_id, COUNT(*) AS like_count
+        FROM post_likes
+        GROUP BY post_id
+      ) l ON l.post_id = p.id
+      LEFT JOIN (
+        SELECT post_id, COUNT(*) AS comment_count
+        FROM post_comments
+        GROUP BY post_id
+      ) c ON c.post_id = p.id
+      ${where}
+      ORDER BY p.created_at DESC
+      LIMIT 100
+    `,
+    params,
+  );
+
+  return result.rows.map(serializePost);
+}
 
 router.get("/users", requireAuth, async (req, res) => {
   const rows = await db.select().from(usersTable).where(ne(usersTable.id, req.session.userId!)).limit(40);
   res.json({ users: rows.map(toPublicUser) });
+});
+
+router.get("/users/:username/profile", async (req, res) => {
+  const username = String(req.params.username || "").replace(/^@+/, "").trim();
+
+  const userResult = await pool.query(
+    `
+      SELECT
+        id,
+        username,
+        password_hash AS "passwordHash",
+        display_name AS "displayName",
+        bio,
+        email,
+        phone,
+        avatar_color AS "avatarColor",
+        avatar_url AS "avatarUrl",
+        instagram,
+        linkedin,
+        facebook,
+        twitter,
+        tiktok,
+        youtube,
+        email_opt_in AS "emailOptIn",
+        sms_opt_in AS "smsOptIn",
+        scholarship_alerts AS "scholarshipAlerts",
+        job_alerts AS "jobAlerts",
+        school_news_alerts AS "schoolNewsAlerts",
+        created_at AS "createdAt"
+      FROM users
+      WHERE lower(username) = lower($1)
+      LIMIT 1
+    `,
+    [username],
+  );
+
+  const user = userResult.rows[0];
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const counts = await pool.query(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM user_follows WHERE following_id = $1)::int AS "followerCount",
+        (SELECT COUNT(*) FROM user_follows WHERE follower_id = $1)::int AS "followingCount",
+        EXISTS (
+          SELECT 1 FROM user_follows
+          WHERE follower_id = $2 AND following_id = $1
+        ) AS "isFollowing"
+    `,
+    [user.id, req.session?.userId ?? 0],
+  );
+
+  const posts = await listPostsWithAuthors({
+    currentUserId: req.session?.userId ?? null,
+    authorId: user.id,
+  });
+
+  return res.json({
+    user: toPublicUser(user),
+    followerCount: Number(counts.rows[0]?.followerCount ?? 0),
+    followingCount: Number(counts.rows[0]?.followingCount ?? 0),
+    isFollowing: Boolean(counts.rows[0]?.isFollowing ?? false),
+    posts,
+  });
 });
 
 router.post("/users/:id/follow", requireAuth, async (req, res) => {
@@ -92,25 +266,170 @@ router.post("/communities/:id/join", requireAuth, async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-router.get("/posts", async (_req, res) => {
-  const rows = await db.select().from(postsTable).orderBy(desc(postsTable.createdAt)).limit(100);
-  res.json({ posts: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() })) });
+router.get("/posts", async (req, res) => {
+  const posts = await listPostsWithAuthors({ currentUserId: req.session?.userId ?? null });
+  res.json({ posts });
 });
 
 router.get("/communities/:id/posts", async (req, res) => {
   const communityId = Number(req.params.id);
-  const rows = await db.select().from(postsTable).where(eq(postsTable.communityId, communityId)).orderBy(desc(postsTable.createdAt)).limit(100);
-  res.json({ posts: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() })) });
+  const posts = await listPostsWithAuthors({ currentUserId: req.session?.userId ?? null, communityId });
+  res.json({ posts });
 });
 
 router.post("/posts", requireAuth, async (req, res) => {
   const parsed = postInputSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Invalid post input" });
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid post input" });
     return;
   }
+
   const [post] = await db.insert(postsTable).values({ ...parsed.data, authorId: req.session.userId! }).returning();
-  res.status(201).json({ post: { ...post, createdAt: post.createdAt.toISOString(), updatedAt: post.updatedAt.toISOString() } });
+  const [hydrated] = await listPostsWithAuthors({ currentUserId: req.session.userId!, authorId: req.session.userId! });
+
+  res.status(201).json({ post: hydrated ?? serializePost(post) });
+});
+
+router.patch("/posts/:id", requireAuth, async (req, res) => {
+  const postId = Number(req.params.id);
+  const parsed = postUpdateSchema.safeParse(req.body);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    res.status(400).json({ error: "Invalid post" });
+    return;
+  }
+
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid post input" });
+    return;
+  }
+
+  const [existing] = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+
+  if (!existing) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
+  if (existing.authorId !== req.session.userId) {
+    res.status(403).json({ error: "You can only edit your own posts." });
+    return;
+  }
+
+  const [updated] = await db.update(postsTable).set({
+    ...parsed.data,
+    updatedAt: new Date(),
+  }).where(eq(postsTable.id, postId)).returning();
+
+  res.json({ post: serializePost(updated) });
+});
+
+router.post("/posts/:id/like", requireAuth, async (req, res) => {
+  const postId = Number(req.params.id);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post" });
+  }
+
+  await pool.query(
+    "INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [postId, req.session.userId!],
+  );
+
+  res.status(201).json({ ok: true });
+});
+
+router.delete("/posts/:id/like", requireAuth, async (req, res) => {
+  const postId = Number(req.params.id);
+
+  await pool.query(
+    "DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2",
+    [postId, req.session.userId!],
+  );
+
+  res.json({ ok: true });
+});
+
+router.get("/posts/:id/comments", async (req, res) => {
+  const postId = Number(req.params.id);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post" });
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.post_id AS "postId",
+        c.user_id AS "userId",
+        c.body,
+        c.created_at AS "createdAt",
+        c.updated_at AS "updatedAt",
+        json_build_object(
+          'id', u.id,
+          'username', u.username,
+          'displayName', u.display_name,
+          'avatarColor', u.avatar_color,
+          'avatarUrl', u.avatar_url
+        ) AS author
+      FROM post_comments c
+      JOIN users u ON u.id = c.user_id
+      WHERE c.post_id = $1
+      ORDER BY c.created_at ASC
+      LIMIT 100
+    `,
+    [postId],
+  );
+
+  res.json({
+    comments: result.rows.map((row) => ({
+      ...row,
+      createdAt: serializeDate(row.createdAt),
+      updatedAt: serializeDate(row.updatedAt),
+    })),
+  });
+});
+
+router.post("/posts/:id/comments", requireAuth, async (req, res) => {
+  const postId = Number(req.params.id);
+  const parsed = commentInputSchema.safeParse(req.body);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post" });
+  }
+
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Comment cannot be empty." });
+  }
+
+  const result = await pool.query(
+    `
+      INSERT INTO post_comments (post_id, user_id, body)
+      VALUES ($1, $2, $3)
+      RETURNING id, post_id AS "postId", user_id AS "userId", body, created_at AS "createdAt", updated_at AS "updatedAt"
+    `,
+    [postId, req.session.userId!, parsed.data.body],
+  );
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+
+  res.status(201).json({
+    comment: {
+      ...result.rows[0],
+      createdAt: serializeDate(result.rows[0].createdAt),
+      updatedAt: serializeDate(result.rows[0].updatedAt),
+      author: user
+        ? {
+            id: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            avatarColor: user.avatarColor,
+            avatarUrl: user.avatarUrl,
+          }
+        : null,
+    },
+  });
 });
 
 router.get("/conversations", requireAuth, async (req, res) => {

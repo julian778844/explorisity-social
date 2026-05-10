@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-label="Aerial overview of an academic campus network">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#ede9fe"/>
+    </linearGradient>
+    <linearGradient id="quad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#86efac"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="820" fill="url(#bg)"/>
+  <circle cx="1110" cy="150" r="120" fill="#fef3c7"/>
+  <ellipse cx="705" cy="535" rx="450" ry="170" fill="url(#quad)" opacity="0.82"/>
+  <g opacity="0.92">
+    <rect x="170" y="250" width="260" height="145" rx="20" fill="#ffffff" stroke="#cbd5e1" stroke-width="7"/>
+    <rect x="475" y="170" width="340" height="215" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="7"/>
+    <rect x="860" y="245" width="330" height="165" rx="24" fill="#ffffff" stroke="#cbd5e1" stroke-width="7"/>
+    <rect x="260" y="515" width="260" height="135" rx="22" fill="#ffffff" stroke="#cbd5e1" stroke-width="7"/>
+    <rect x="780" y="510" width="310" height="145" rx="22" fill="#ffffff" stroke="#cbd5e1" stroke-width="7"/>
+  </g>
+  <g fill="#93c5fd">
+    <rect x="215" y="282" width="58" height="80" rx="8"/>
+    <rect x="303" y="282" width="58" height="80" rx="8"/>
+    <rect x="525" y="215" width="58" height="120" rx="8"/>
+    <rect x="610" y="215" width="58" height="120" rx="8"/>
+    <rect x="695" y="215" width="58" height="120" rx="8"/>
+    <rect x="910" y="285" width="72" height="90" rx="8"/>
+    <rect x="1010" y="285" width="72" height="90" rx="8"/>
+  </g>
+  <path d="M180 700 C380 610 560 650 700 570 C850 485 1020 580 1225 475" fill="none" stroke="#ffffff" stroke-width="68" stroke-linecap="round" opacity="0.92"/>
+  <path d="M180 700 C380 610 560 650 700 570 C850 485 1020 580 1225 475" fill="none" stroke="#cbd5e1" stroke-width="5" stroke-linecap="round"/>
+  <g opacity="0.8" stroke="#2563eb" stroke-width="4">
+    <line x1="320" y1="318" x2="645" y2="275"/>
+    <line x1="645" y1="275" x2="1010" y2="330"/>
+    <line x1="645" y1="275" x2="920" y2="575"/>
+    <line x1="390" y1="575" x2="645" y2="275"/>
+  </g>
+  <g fill="#2563eb">
+    <circle cx="320" cy="318" r="12"/>
+    <circle cx="645" cy="275" r="12"/>
+    <circle cx="1010" cy="330" r="12"/>
+    <circle cx="920" cy="575" r="12"/>
+    <circle cx="390" cy="575" r="12"/>
+  </g>
+  <text x="80" y="105" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="900" fill="#0f172a">Explorisity</text>
+  <text x="84" y="150" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="650" fill="#475569">Universities • opportunities • student networks</text>
+</svg>

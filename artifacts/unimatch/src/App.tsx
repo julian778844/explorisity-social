@@ -20,8 +20,11 @@ import TradeRankingsPage from "@/pages/TradeRankingsPage";
 import SchoolProfilePage from "@/pages/SchoolProfilePage";
 import ContactPage from "@/pages/ContactPage";
 import ProfilePage from "@/pages/ProfilePage";
+import PublicProfilePage from "@/pages/PublicProfilePage";
 import SocialPage from "@/pages/SocialPage";
 import ChanceMe from "@/pages/ChanceMe";
+import SearchPage from "@/pages/SearchPage";
+import ExplorePage from "@/pages/ExplorePage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -43,9 +46,12 @@ function Router() {
       <Route path="/ai-picks" component={AiPicksPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/profile/:username" component={PublicProfilePage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/social" component={SocialPage} />
       <Route path="/chance-me" component={ChanceMe} />
+      <Route path="/search" component={SearchPage} />
+      <Route path="/explore" component={ExplorePage} />
       <Route component={NotFound} />
     </Switch>
   );

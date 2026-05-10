@@ -6,6 +6,7 @@ export type ApiUser = {
   email: string | null;
   phone: string | null;
   avatarColor: string;
+  avatarUrl: string | null;
   instagram: string | null;
   linkedin: string | null;
   facebook: string | null;
@@ -164,6 +165,7 @@ export const api = {
         | "email"
         | "phone"
         | "avatarColor"
+        | "avatarUrl"
         | "instagram"
         | "linkedin"
         | "facebook"
@@ -202,5 +204,17 @@ export const api = {
   listMessages: (conversationId: number) => request<{ messages: Message[] }>(`/social/conversations/${conversationId}/messages`),
   sendMessage: (conversationId: number, body: string) =>
     request<{ message: Message }>(`/social/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ body }) }),
-  search: (q: string) => request<{ schools: Array<{ id: string | number; name: string; type: string }>; users: ApiUser[]; communities: Community[] }>(`/search?q=${encodeURIComponent(q)}`),
+  uploadAvatar: (avatarDataUrl: string) =>
+    request<{ user: ApiUser }>("/upload/avatar", {
+      method: "POST",
+      body: JSON.stringify({ avatarDataUrl }),
+    }),
+  search: (q: string) =>
+    request<{
+      schools: Array<{ id: string | number; name: string; type: string; href?: string }>;
+      users: ApiUser[];
+      communities: Community[];
+      posts: SocialPost[];
+      opportunities: SocialPost[];
+    }>(`/search?q=${encodeURIComponent(q)}`),
 };

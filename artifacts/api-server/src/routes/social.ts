@@ -36,9 +36,14 @@ const communityInputSchema = z.object({
 const dmInputSchema = z.object({ recipientUserId: z.number().int().positive() });
 const groupInputSchema = z.object({ name: z.string().min(2).max(140), memberIds: z.array(z.number().int().positive()).min(1).max(50) });
 const messageInputSchema = z.object({ body: z.string().min(1).max(5000) });
-const commentInputSchema = z.object({ body: z.string().min(1).max(1000) });
+const commentInputSchema = z.object({
+  body: z.string().min(1).max(1000),
+  parentCommentId: z.number().int().positive().optional().nullable(),
+});
 const followPrivacySchema = z.object({ showFollowers: z.boolean(), showFollowing: z.boolean() });
 const pinnedFollowersSchema = z.object({ pinnedFollowerIds: z.array(z.number().int().positive()).max(6) });
+const notificationTypes = ["follow", "post_like", "post_comment", "comment_reply", "mention"] as const;
+type NotificationType = (typeof notificationTypes)[number];
 
 function currentUserId(req: Request) {
   return getAuthenticatedUserId(req);
@@ -260,8 +265,225 @@ async function isFollowing(followerId: number | null | undefined, followingId: n
     "SELECT 1 FROM user_follows WHERE follower_id = $1 AND following_id = $2 LIMIT 1",
     [followerId, followingId],
   );
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }
+
+let notificationSchemaReady: Promise<void> | null = null;
+
+async function ensureNotificationSchema() {
+  if (!notificationSchemaReady) {
+    notificationSchemaReady = pool
+      .query(
+        `
+          ALTER TABLE post_comments
+            ADD COLUMN IF NOT EXISTS parent_comment_id INTEGER REFERENCES post_comments(id) ON DELETE CASCADE;
+
+          CREATE INDEX IF NOT EXISTS post_comments_parent_idx ON post_comments(parent_comment_id);
+
+          CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type VARCHAR(32) NOT NULL,
+            post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+            comment_id INTEGER REFERENCES post_comments(id) ON DELETE CASCADE,
+            read_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+
+          CREATE INDEX IF NOT EXISTS notifications_recipient_idx ON notifications(recipient_id, created_at DESC);
+          CREATE INDEX IF NOT EXISTS notifications_actor_idx ON notifications(actor_id);
+          CREATE INDEX IF NOT EXISTS notifications_post_idx ON notifications(post_id);
+          CREATE INDEX IF NOT EXISTS notifications_comment_idx ON notifications(comment_id);
+
+          CREATE UNIQUE INDEX IF NOT EXISTS notifications_dedupe_uidx
+            ON notifications (
+              recipient_id,
+              actor_id,
+              type,
+              COALESCE(post_id, 0),
+              COALESCE(comment_id, 0)
+            );
+        `,
+      )
+      .then(() => undefined)
+      .catch((error) => {
+        notificationSchemaReady = null;
+        throw error;
+      });
+  }
+
+  return notificationSchemaReady;
+}
+
+function serializeNotification(row: any) {
+  const actor = row.actor ?? null;
+  const postId = row.postId ?? row.post_id ?? null;
+  const commentId = row.commentId ?? row.comment_id ?? null;
+  const type = row.type as NotificationType;
+  const href =
+    type === "follow"
+      ? actor?.username
+        ? `/profile/${actor.username}`
+        : "/profile"
+      : postId
+        ? `/post/${postId}${commentId ? `?comment=${commentId}` : ""}`
+        : "/social";
+
+  return {
+    id: Number(row.id),
+    recipientId: Number(row.recipientId ?? row.recipient_id),
+    actorId: Number(row.actorId ?? row.actor_id),
+    type,
+    postId: postId === null ? null : Number(postId),
+    commentId: commentId === null ? null : Number(commentId),
+    readAt: row.readAt ?? row.read_at ? serializeDate(row.readAt ?? row.read_at) : null,
+    createdAt: serializeDate(row.createdAt ?? row.created_at),
+    updatedAt: serializeDate(row.updatedAt ?? row.updated_at),
+    actor,
+    postTitle: row.postTitle ?? null,
+    postPreview: row.postPreview ?? null,
+    commentPreview: row.commentPreview ?? null,
+    href,
+  };
+}
+
+async function createNotification(input: {
+  recipientId: number;
+  actorId: number;
+  type: NotificationType;
+  postId?: number | null;
+  commentId?: number | null;
+}) {
+  if (input.recipientId === input.actorId) return;
+
+  await ensureNotificationSchema();
+  await pool.query(
+    `
+      INSERT INTO notifications (recipient_id, actor_id, type, post_id, comment_id)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT DO NOTHING
+    `,
+    [input.recipientId, input.actorId, input.type, input.postId ?? null, input.commentId ?? null],
+  );
+}
+
+async function notifyMentionedUsers(actorId: number, text: string, postId?: number | null, commentId?: number | null) {
+  const usernames = Array.from(
+    new Set(
+      Array.from(text.matchAll(/@([a-zA-Z0-9_]{3,32})/g))
+        .map((match) => match[1]?.toLowerCase())
+        .filter(Boolean) as string[],
+    ),
+  );
+
+  if (!usernames.length) return;
+
+  const result = await pool.query(
+    "SELECT id FROM users WHERE LOWER(username) = ANY($1::text[])",
+    [usernames],
+  );
+
+  await Promise.all(
+    result.rows
+      .map((row) => Number(row.id))
+      .filter((recipientId) => recipientId !== actorId)
+      .map((recipientId) =>
+        createNotification({
+          recipientId,
+          actorId,
+          type: "mention",
+          postId: postId ?? null,
+          commentId: commentId ?? null,
+        }),
+      ),
+  );
+}
+
+router.get("/notifications", requireAuth, async (req, res) => {
+  await ensureNotificationSchema();
+
+  const [items, count] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          n.id,
+          n.recipient_id AS "recipientId",
+          n.actor_id AS "actorId",
+          n.type,
+          n.post_id AS "postId",
+          n.comment_id AS "commentId",
+          n.read_at AS "readAt",
+          n.created_at AS "createdAt",
+          n.updated_at AS "updatedAt",
+          json_build_object(
+            'id', u.id,
+            'username', u.username,
+            'displayName', u.display_name,
+            'avatarColor', u.avatar_color,
+            'avatarUrl', u.avatar_url
+          ) AS actor,
+          p.title AS "postTitle",
+          LEFT(p.body, 140) AS "postPreview",
+          LEFT(c.body, 140) AS "commentPreview"
+        FROM notifications n
+        JOIN users u ON u.id = n.actor_id
+        LEFT JOIN posts p ON p.id = n.post_id
+        LEFT JOIN post_comments c ON c.id = n.comment_id
+        WHERE n.recipient_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT 60
+      `,
+      [req.session.userId!],
+    ),
+    pool.query(
+      "SELECT COUNT(*)::int AS count FROM notifications WHERE recipient_id = $1 AND read_at IS NULL",
+      [req.session.userId!],
+    ),
+  ]);
+
+  return res.json({
+    notifications: items.rows.map(serializeNotification),
+    unreadCount: Number(count.rows[0]?.count ?? 0),
+  });
+});
+
+router.get("/notifications/unread-count", requireAuth, async (req, res) => {
+  await ensureNotificationSchema();
+  const result = await pool.query(
+    "SELECT COUNT(*)::int AS count FROM notifications WHERE recipient_id = $1 AND read_at IS NULL",
+    [req.session.userId!],
+  );
+
+  return res.json({ unreadCount: Number(result.rows[0]?.count ?? 0) });
+});
+
+router.post("/notifications/read-all", requireAuth, async (req, res) => {
+  await ensureNotificationSchema();
+  await pool.query(
+    "UPDATE notifications SET read_at = COALESCE(read_at, NOW()), updated_at = NOW() WHERE recipient_id = $1 AND read_at IS NULL",
+    [req.session.userId!],
+  );
+
+  return res.json({ ok: true });
+});
+
+router.post("/notifications/:id/read", requireAuth, async (req, res) => {
+  await ensureNotificationSchema();
+
+  const notificationId = Number(req.params.id);
+  if (!Number.isInteger(notificationId) || notificationId <= 0) {
+    return res.status(400).json({ error: "Invalid notification." });
+  }
+
+  await pool.query(
+    "UPDATE notifications SET read_at = COALESCE(read_at, NOW()), updated_at = NOW() WHERE id = $1 AND recipient_id = $2",
+    [notificationId, req.session.userId!],
+  );
+
+  return res.json({ ok: true });
+});
 
 router.get("/users", requireAuth, async (req, res) => {
   const result = await pool.query(
@@ -314,10 +536,18 @@ router.post("/users/:id/follow", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "User not found." });
   }
 
-  await pool.query(
+  const follow = await pool.query(
     "INSERT INTO user_follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     [req.session.userId!, targetId],
   );
+
+  if ((follow.rowCount ?? 0) > 0) {
+    await createNotification({
+      recipientId: targetId,
+      actorId: req.session.userId!,
+      type: "follow",
+    });
+  }
 
   return res.status(201).json({ ok: true });
 });
@@ -590,6 +820,20 @@ router.get("/communities/:id/posts", async (req, res) => {
   return res.json({ posts: posts.flat() });
 });
 
+router.get("/posts/:id", async (req, res) => {
+  const postId = Number(req.params.id);
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post." });
+  }
+
+  const [post] = await getPosts({ currentUserId: currentUserId(req), postId, limit: 1 });
+  if (!post) {
+    return res.status(404).json({ error: "Post not found." });
+  }
+
+  return res.json({ post });
+});
+
 router.post("/posts", requireAuth, async (req, res) => {
   const parsed = postInputSchema.safeParse(req.body);
 
@@ -619,6 +863,7 @@ router.post("/posts", requireAuth, async (req, res) => {
   );
 
   const [post] = await getPosts({ currentUserId: req.session.userId!, postId: Number(result.rows[0].id), limit: 1 });
+  await notifyMentionedUsers(req.session.userId!, `${parsed.data.title} ${parsed.data.body}`, post.id);
   return res.status(201).json({ post });
 });
 
@@ -678,6 +923,7 @@ router.patch("/posts/:id", requireAuth, async (req, res) => {
   );
 
   const [post] = await getPosts({ currentUserId: req.session.userId!, postId, limit: 1 });
+  await notifyMentionedUsers(req.session.userId!, `${post.title} ${post.body}`, post.id);
   return res.json({ post });
 });
 
@@ -688,10 +934,27 @@ router.post("/posts/:id/like", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Invalid post." });
   }
 
-  await pool.query(
-    "INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+  const owner = await pool.query("SELECT author_id FROM posts WHERE id = $1 LIMIT 1", [postId]);
+  if (!owner.rows[0]) {
+    return res.status(404).json({ error: "Post not found." });
+  }
+
+  const like = await pool.query(
+    "INSERT INTO post_likes (post_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id",
     [postId, req.session.userId!],
   );
+
+  if ((like.rowCount ?? 0) > 0) {
+    const recipientId = Number(owner.rows[0]?.author_id);
+    if (recipientId) {
+      await createNotification({
+        recipientId,
+        actorId: req.session.userId!,
+        type: "post_like",
+        postId,
+      });
+    }
+  }
 
   return res.status(201).json({ ok: true });
 });
@@ -717,12 +980,15 @@ router.get("/posts/:id/comments", async (req, res) => {
     return res.status(400).json({ error: "Invalid post." });
   }
 
+  await ensureNotificationSchema();
+
   const result = await pool.query(
     `
       SELECT
         c.id,
         c.post_id AS "postId",
         c.user_id AS "userId",
+        c.parent_comment_id AS "parentCommentId",
         c.body,
         c.created_at AS "createdAt",
         c.updated_at AS "updatedAt",
@@ -763,14 +1029,56 @@ router.post("/posts/:id/comments", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Comment cannot be empty." });
   }
 
+  await ensureNotificationSchema();
+
+  const postOwner = await pool.query("SELECT author_id FROM posts WHERE id = $1 LIMIT 1", [postId]);
+  if (!postOwner.rows[0]) {
+    return res.status(404).json({ error: "Post not found." });
+  }
+
+  let parentOwnerId: number | null = null;
+  if (parsed.data.parentCommentId) {
+    const parent = await pool.query(
+      "SELECT id, user_id FROM post_comments WHERE id = $1 AND post_id = $2 LIMIT 1",
+      [parsed.data.parentCommentId, postId],
+    );
+
+    if (!parent.rows[0]) {
+      return res.status(400).json({ error: "Reply target not found." });
+    }
+
+    parentOwnerId = Number(parent.rows[0].user_id);
+  }
+
   const result = await pool.query(
     `
-      INSERT INTO post_comments (post_id, user_id, body)
-      VALUES ($1, $2, $3)
-      RETURNING id, post_id AS "postId", user_id AS "userId", body, created_at AS "createdAt", updated_at AS "updatedAt"
+      INSERT INTO post_comments (post_id, user_id, parent_comment_id, body)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, post_id AS "postId", user_id AS "userId", parent_comment_id AS "parentCommentId", body, created_at AS "createdAt", updated_at AS "updatedAt"
     `,
-    [postId, req.session.userId!, parsed.data.body],
+    [postId, req.session.userId!, parsed.data.parentCommentId ?? null, parsed.data.body],
   );
+
+  const commentId = Number(result.rows[0].id);
+  if (parentOwnerId) {
+    await createNotification({
+      recipientId: parentOwnerId,
+      actorId: req.session.userId!,
+      type: "comment_reply",
+      postId,
+      commentId,
+    });
+  } else {
+    await createNotification({
+      recipientId: Number(postOwner.rows[0].author_id),
+      actorId: req.session.userId!,
+      type: "post_comment",
+      postId,
+      commentId,
+    });
+  }
+
+  await notifyMentionedUsers(req.session.userId!, parsed.data.body, postId, commentId);
 
   res.status(201).json({
     comment: {

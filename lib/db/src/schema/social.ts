@@ -1,8 +1,10 @@
-import { pgTable, serial, integer, text, varchar, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, varchar, timestamp, uniqueIndex, index, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const POST_CATEGORIES = ["promotion", "job", "event", "general"] as const;
 export type PostCategory = (typeof POST_CATEGORIES)[number];
+export const NOTIFICATION_TYPES = ["follow", "post_like", "post_comment", "comment_reply", "mention"] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const userFollowsTable = pgTable(
   "user_follows",
@@ -79,11 +81,37 @@ export const postCommentsTable = pgTable(
     id: serial("id").primaryKey(),
     postId: integer("post_id").notNull().references(() => postsTable.id, { onDelete: "cascade" }),
     userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    parentCommentId: integer("parent_comment_id").references((): AnyPgColumn => postCommentsTable.id, { onDelete: "cascade" }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("post_comments_post_idx").on(t.postId), index("post_comments_user_idx").on(t.userId)],
+  (t) => [
+    index("post_comments_post_idx").on(t.postId),
+    index("post_comments_user_idx").on(t.userId),
+    index("post_comments_parent_idx").on(t.parentCommentId),
+  ],
+);
+
+export const notificationsTable = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    recipientId: integer("recipient_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    actorId: integer("actor_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 32 }).notNull().$type<NotificationType>(),
+    postId: integer("post_id").references(() => postsTable.id, { onDelete: "cascade" }),
+    commentId: integer("comment_id").references(() => postCommentsTable.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notifications_recipient_idx").on(t.recipientId, t.createdAt),
+    index("notifications_actor_idx").on(t.actorId),
+    index("notifications_post_idx").on(t.postId),
+    index("notifications_comment_idx").on(t.commentId),
+  ],
 );
 
 export const conversationsTable = pgTable(

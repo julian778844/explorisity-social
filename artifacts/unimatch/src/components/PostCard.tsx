@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Heart, MessageCircle, Pencil, Send, Share2, X } from "lucide-react";
-import { api, type SocialPost } from "@/lib/api";
+import { ExternalLink, Heart, MessageCircle, Pencil, Reply, Send, Share2, X } from "lucide-react";
+import { api, type PostComment, type SocialPost } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatPostTime, wasPostEdited } from "@/lib/postTime";
 import FollowHoverCard from "@/components/FollowHoverCard";
@@ -25,12 +25,23 @@ function PostImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export default function PostCard({ post, canEdit = false }: { post: SocialPost; canEdit?: boolean }) {
+export default function PostCard({
+  post,
+  canEdit = false,
+  initialCommentsOpen = false,
+  highlightCommentId,
+}: {
+  post: SocialPost;
+  canEdit?: boolean;
+  initialCommentsOpen?: boolean;
+  highlightCommentId?: number | null;
+}) {
   const { user, openSignIn } = useAuth();
   const qc = useQueryClient();
 
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
   const [comment, setComment] = useState("");
+  const [replyTarget, setReplyTarget] = useState<PostComment | null>(null);
   const [editing, setEditing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [draft, setDraft] = useState({
@@ -52,6 +63,12 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
     enabled: commentsOpen,
   });
 
+  useEffect(() => {
+    if (!highlightCommentId || !commentsOpen || commentsQuery.isLoading) return;
+    const el = document.getElementById(`comment-${highlightCommentId}`);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [commentsOpen, commentsQuery.data, commentsQuery.isLoading, highlightCommentId]);
+
   const likeMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Sign in to like posts.");
@@ -61,6 +78,7 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
       qc.invalidateQueries({ queryKey: ["posts"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["public-profile"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: () => openSignIn("signin"),
   });
@@ -68,15 +86,17 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
   const commentMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Sign in to comment.");
-      return api.createPostComment(post.id, comment.trim());
+      return api.createPostComment(post.id, comment.trim(), replyTarget?.id ?? null);
     },
     onSuccess: () => {
       setComment("");
+      setReplyTarget(null);
       setError(null);
       qc.invalidateQueries({ queryKey: ["post-comments", post.id] });
       qc.invalidateQueries({ queryKey: ["posts"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["public-profile"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -266,12 +286,22 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
           {commentsOpen && (
             <div className="mt-4 space-y-3 rounded-2xl border border-border bg-background/70 p-4 backdrop-blur">
               <div className="flex gap-2">
-                <input
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder={user ? "Write a comment..." : "Sign in to comment"}
-                  className="min-w-0 flex-1 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium"
-                />
+                <div className="min-w-0 flex-1">
+                  {replyTarget && (
+                    <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground">
+                      <span className="truncate">Replying to @{replyTarget.author?.username ?? "user"}</span>
+                      <button onClick={() => setReplyTarget(null)} className="rounded-lg p-1 hover:bg-muted" aria-label="Cancel reply">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder={user ? "Write a comment..." : "Sign in to comment"}
+                    className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium"
+                  />
+                </div>
                 <button
                   onClick={submitComment}
                   disabled={commentMutation.isPending}
@@ -286,9 +316,15 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
               {commentsQuery.isLoading && <p className="text-sm font-semibold text-muted-foreground">Loading comments...</p>}
 
               {(commentsQuery.data ?? []).map((c) => (
-                <div key={c.id} className="flex gap-3 rounded-xl bg-card p-3">
+                <div
+                  id={`comment-${c.id}`}
+                  key={c.id}
+                  className={`flex gap-3 rounded-xl bg-card p-3 transition ${
+                    c.parentCommentId ? "ml-6 border-l-2 border-primary/25" : ""
+                  } ${highlightCommentId === c.id ? "ring-2 ring-primary/50" : ""}`}
+                >
                   <FollowHoverCard author={c.author}>
-                    <Link href={c.author?.username ? `/profile/${c.author.username}` : "/profile"} className="flex min-w-0 gap-3">
+                    <Link href={c.author?.username ? `/profile/${c.author.username}` : "/profile"} className="flex min-w-0 flex-1 gap-3">
                       <UserAvatar user={c.author} size="sm" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-black hover:underline">@{c.author?.username ?? "user"}</p>
@@ -296,6 +332,19 @@ export default function PostCard({ post, canEdit = false }: { post: SocialPost; 
                       </div>
                     </Link>
                   </FollowHoverCard>
+                  <button
+                    onClick={() => {
+                      if (!user) {
+                        openSignIn("signin");
+                        return;
+                      }
+                      setReplyTarget(c);
+                    }}
+                    className="ml-auto inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <Reply className="h-3.5 w-3.5" />
+                    Reply
+                  </button>
                 </div>
               ))}
 

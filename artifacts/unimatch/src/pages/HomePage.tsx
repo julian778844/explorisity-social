@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Award, Briefcase, MessageCircle, Search, Sparkles, Trophy, Users } from "lucide-react";
+import { ArrowRight, Award, BarChart3, Briefcase, MapPin, MessageCircle, Search, Sparkles, Trophy, Users } from "lucide-react";
 import { universities } from "@/data/universities";
 import UniversitySelector from "@/components/UniversitySelector";
 import EasyPostWidget from "@/components/EasyPostWidget";
@@ -52,6 +52,52 @@ function TrendingSchoolCard({ school }: { school: TrendingSchool }) {
   );
 }
 
+function RankingPreviewCard({ school, rank }: { school: TrendingSchool; rank: number }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const campusPhoto = getHeroPhoto(school.id);
+
+  return (
+    <Link
+      href={`/university/${school.id}`}
+      className="group grid overflow-hidden rounded-2xl border border-border bg-background transition hover:bg-muted md:grid-cols-[150px_1fr]"
+    >
+      <div className="relative h-28 bg-muted md:h-full">
+        {campusPhoto && !imageFailed ? (
+          <img
+            src={campusPhoto}
+            alt={`${school.name} campus`}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center px-3 text-center" style={{ backgroundColor: `${school.color}22` }}>
+            <span className="text-xs font-black">{school.shortName}</span>
+          </div>
+        )}
+        <div className="absolute left-3 top-3 rounded-full bg-background/95 px-3 py-1 text-xs font-black shadow">
+          #{rank}
+        </div>
+      </div>
+
+      <div className="flex min-w-0 gap-3 p-4">
+        <SchoolLogo id={school.id} name={school.name} color={school.color} size={48} rounded="xl" />
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-black">{school.name}</h3>
+          <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            {school.location}
+          </p>
+          <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-muted-foreground">
+            Strong academics, student outcomes, and campus reputation across the Explorisity index.
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export default function HomePage() {
   const { user, openSignIn } = useAuth();
   const [, navigate] = useLocation();
@@ -70,6 +116,8 @@ export default function HomePage() {
   const topSchools = [...universities]
     .sort((a, b) => b.prestigeScore - a.prestigeScore)
     .slice(0, 5);
+
+  const rankingPreview = topSchools.slice(0, 3);
 
   const realPosts = postsQuery.data ?? [];
   const opportunities = useMemo(
@@ -178,6 +226,43 @@ export default function HomePage() {
               </Link>
             </div>
           </section>
+        </div>
+      </section>
+
+      <section className="mx-auto mt-6 grid max-w-7xl gap-6 rounded-3xl border border-border bg-card p-5 shadow-sm lg:grid-cols-[0.84fr_1.16fr] lg:p-6">
+        <div className="flex flex-col justify-between">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">
+              <BarChart3 className="h-4 w-4" />
+              Rankings hub
+            </div>
+            <h2 className="text-3xl font-black tracking-tight md:text-4xl">View Rankings</h2>
+            <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-muted-foreground">
+              Explore top colleges by academics, campus life, value, student experience, career outcomes, and momentum across the platform.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {["Overall", "Campus life", "Academics", "Value", "Student experience"].map((category) => (
+                <span key={category} className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-black text-muted-foreground">
+                  {category}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <Link
+            href="/rankings"
+            className="mt-6 inline-flex w-fit items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-black text-primary-foreground shadow-sm transition hover:opacity-90"
+          >
+            View Full Rankings
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="grid gap-3">
+          {rankingPreview.map((school, index) => (
+            <RankingPreviewCard key={school.id} school={school} rank={index + 1} />
+          ))}
         </div>
       </section>
 

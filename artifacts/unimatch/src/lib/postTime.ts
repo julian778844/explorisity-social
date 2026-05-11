@@ -45,15 +45,23 @@ function getParts(value: string | Date): DateParts {
 }
 
 export function formatPostTime(value: string | Date, prefix: "Posted" | "Edited" = "Posted") {
-  const parts = getParts(value);
-  const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod}`.trim();
-  const zone = parts.timeZoneName || "UTC";
+  const formatted = formatTimeWithZone(value);
 
   if (prefix === "Edited") {
+    const parts = getParts(value);
+    const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod}`.trim();
+    const zone = parts.timeZoneName || "UTC";
     return `${prefix} ${time} ${zone}`;
   }
 
-  return `${prefix} ${parts.month} ${parts.day}, ${parts.year} at ${time} ${zone}`;
+  return `${prefix} ${formatted}`;
+}
+
+export function formatTimeWithZone(value: string | Date) {
+  const parts = getParts(value);
+  const time = `${parts.hour}:${parts.minute} ${parts.dayPeriod}`.trim();
+  const zone = parts.timeZoneName || "UTC";
+  return `${parts.month} ${parts.day}, ${parts.year} at ${time} ${zone}`;
 }
 
 export function wasPostEdited(createdAt: string, updatedAt?: string | null) {

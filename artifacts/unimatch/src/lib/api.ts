@@ -61,10 +61,30 @@ export type PostComment = {
   id: number;
   postId: number;
   userId: number;
+  parentCommentId: number | null;
   body: string;
   createdAt: string;
   updatedAt: string;
   author?: PostAuthor | null;
+};
+
+export type NotificationType = "follow" | "post_like" | "post_comment" | "comment_reply" | "mention";
+
+export type NotificationItem = {
+  id: number;
+  recipientId: number;
+  actorId: number;
+  type: NotificationType;
+  postId: number | null;
+  commentId: number | null;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  actor?: PostAuthor | null;
+  postTitle?: string | null;
+  postPreview?: string | null;
+  commentPreview?: string | null;
+  href: string;
 };
 
 
@@ -276,6 +296,7 @@ updatePinnedFollowers: (pinnedFollowerIds: number[]) =>
   joinCommunity: (id: number) => request<{ ok: true }>(`/social/communities/${id}/join`, { method: "POST" }),
 
   listPosts: () => request<{ posts: SocialPost[] }>("/social/posts"),
+  getPost: (id: number) => request<{ post: SocialPost }>(`/social/posts/${id}`),
 
   createPost: (b: { communityId?: number | null; category: SocialPost["category"]; title: string; body: string; url?: string | null; imageUrl?: string | null }) =>
     request<{ post: SocialPost }>("/social/posts", { method: "POST", body: JSON.stringify(b) }),
@@ -287,8 +308,16 @@ updatePinnedFollowers: (pinnedFollowerIds: number[]) =>
   unlikePost: (id: number) => request<{ ok: true }>(`/social/posts/${id}/like`, { method: "DELETE" }),
 
   listPostComments: (id: number) => request<{ comments: PostComment[] }>(`/social/posts/${id}/comments`),
-  createPostComment: (id: number, body: string) =>
-    request<{ comment: PostComment }>(`/social/posts/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
+  createPostComment: (id: number, body: string, parentCommentId?: number | null) =>
+    request<{ comment: PostComment }>(`/social/posts/${id}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body, parentCommentId: parentCommentId ?? null }),
+    }),
+
+  listNotifications: () => request<{ notifications: NotificationItem[]; unreadCount: number }>("/social/notifications"),
+  getUnreadNotificationCount: () => request<{ unreadCount: number }>("/social/notifications/unread-count"),
+  markNotificationRead: (id: number) => request<{ ok: true }>(`/social/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () => request<{ ok: true }>("/social/notifications/read-all", { method: "POST" }),
 
   listConversations: () => request<{ conversations: Conversation[] }>("/social/conversations"),
   createDm: (recipientUserId: number) =>

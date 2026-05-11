@@ -1,30 +1,13 @@
 import { Link, useParams } from "wouter";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, UserPlus, UserMinus } from "lucide-react";
+import { ArrowLeft, UserCheck, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 import FollowerToolsModal from "@/components/FollowerToolsModal";
-
-function Avatar({ src, name, color }: { src?: string | null; name: string; color: string }) {
-  if (src) return <img src={src} alt={name} className="h-24 w-24 rounded-3xl object-cover shadow-xl" />;
-  return (
-    <div className="flex h-24 w-24 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl" style={{ backgroundColor: color }}>
-      {name.slice(0, 1).toUpperCase()}
-    {followerModal && (
-        <FollowerToolsModal
-          open={!!followerModal}
-          onClose={() => setFollowerModal(null)}
-          profileUserId={profile.user.id}
-          profileUsername={profile.user.username}
-          initialMode={followerModal}
-          isOwnProfile={isOwnProfile}
-        />
-      )}
-    </div>
-  );
-}
+import UserAvatar from "@/components/UserAvatar";
+import SocialLinks from "@/components/SocialLinks";
 
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
@@ -47,7 +30,7 @@ export default function PublicProfilePage() {
         openSignIn("signin");
         return;
       }
-      if (!profile) return;
+      if (!profile || profile.user.id === user.id) return;
       return profile.isFollowing ? api.unfollowUser(profile.user.id) : api.followUser(profile.user.id);
     },
     onSuccess: () => {
@@ -91,11 +74,16 @@ export default function PublicProfilePage() {
       <section className="mb-6 rounded-3xl border border-border bg-card p-8 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="flex flex-wrap items-center gap-5">
-            <Avatar src={profile.user.avatarUrl} name={profile.user.displayName} color={profile.user.avatarColor} />
+            <UserAvatar user={profile.user} size="xl" className="shadow-xl" />
             <div>
               <h1 className="text-3xl font-black">{profile.user.displayName}</h1>
               <p className="mt-1 text-sm font-semibold text-muted-foreground">@{profile.user.username}</p>
-              {profile.user.bio && <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{profile.user.bio}</p>}
+              {profile.user.bio ? (
+                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{profile.user.bio}</p>
+              ) : (
+                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">No bio yet.</p>
+              )}
+              <SocialLinks user={profile.user} size="md" className="mt-4" />
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
@@ -118,10 +106,14 @@ export default function PublicProfilePage() {
             <button
               onClick={() => followMutation.mutate()}
               disabled={followMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-60"
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black disabled:opacity-60 ${
+                profile.isFollowing
+                  ? "border border-primary/30 bg-primary/10 text-primary"
+                  : "bg-primary text-primary-foreground"
+              }`}
             >
-              {profile.isFollowing ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-              {profile.isFollowing ? "Unfollow" : "Follow"}
+              {profile.isFollowing ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+              {profile.isFollowing ? "Following" : "Follow"}
             </button>
           )}
         </div>
@@ -141,9 +133,10 @@ export default function PublicProfilePage() {
           <PostCard key={post.id} post={post} canEdit={isOwnProfile} />
         ))}
       </section>
-    {followerModal && (
+
+      {followerModal && (
         <FollowerToolsModal
-          open={!!followerModal}
+          open
           onClose={() => setFollowerModal(null)}
           profileUserId={profile.user.id}
           profileUsername={profile.user.username}

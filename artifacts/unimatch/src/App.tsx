@@ -21,6 +21,7 @@ import SchoolProfilePage from "@/pages/SchoolProfilePage";
 import ContactPage from "@/pages/ContactPage";
 import ProfilePage from "@/pages/ProfilePage";
 import PublicProfilePage from "@/pages/PublicProfilePage";
+import StudentJourneyPage from "@/pages/StudentJourneyPage";
 import SocialPage from "@/pages/SocialPage";
 import ChanceMe from "@/pages/ChanceMe";
 import SearchPage from "@/pages/SearchPage";
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/profile/:username" component={PublicProfilePage} />
+      <Route path="/student-journey" component={StudentJourneyPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/social" component={SocialPage} />
       <Route path="/chance-me" component={ChanceMe} />

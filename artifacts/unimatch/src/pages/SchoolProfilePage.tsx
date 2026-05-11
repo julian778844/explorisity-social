@@ -59,6 +59,8 @@ function Hero({ id, name, kind, color, loc, icon: Icon, backHref, backLabel, typ
         images={photos}
         alt={`${name} campus`}
         overlay="bottom"
+        fallbackTitle={name}
+        fallbackColor={color}
         className="absolute inset-0"
       />
       <div className="relative p-8 md:p-10 text-white min-h-[320px] flex flex-col justify-end pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">

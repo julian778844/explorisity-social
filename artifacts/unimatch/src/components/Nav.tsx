@@ -15,6 +15,7 @@ import {
   Wrench,
   Users,
   Search as SearchIcon,
+  NotebookPen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -33,6 +34,7 @@ const NAV_LINKS = [
   { href: "/mba", label: "MBA Program Rankings", icon: Briefcase, group: "Rankings" },
   { href: "/trade", label: "Trade & Technical", icon: Wrench, group: "Rankings" },
   { href: "/trending", label: "Trending Matchups", icon: Compass, group: "Discover" },
+  { href: "/student-journey", label: "Student Journey", icon: NotebookPen, group: "Discover" },
   { href: "/social", label: "Social Communities", icon: Users, group: "Discover" },
   { href: "/chance-me", label: "Chance Me", icon: Compass, group: "Discover" },
   { href: "/ai-picks", label: "AI Picks", icon: Compass, group: "Discover" },

@@ -1,3 +1,5 @@
+import { Link } from "wouter";
+
 export default function AcademicNetworkHero() {
   return (
     <section className="relative overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
@@ -29,20 +31,20 @@ export default function AcademicNetworkHero() {
           </p>
 
           <div className="mt-7 flex flex-wrap gap-3">
-            <a href="/search" className="rounded-xl bg-primary px-5 py-3 text-sm font-black text-primary-foreground shadow-sm transition hover:opacity-90">
+            <Link href="/search" className="rounded-xl bg-primary px-5 py-3 text-sm font-black text-primary-foreground shadow-sm transition hover:opacity-90">
               Search Explorisity
-            </a>
-            <a href="/explore" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
+            </Link>
+            <Link href="/explore" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
               Explore feed
-            </a>
-            <a href="/rankings" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
+            </Link>
+            <Link href="/rankings" className="rounded-xl border border-border bg-background/85 px-5 py-3 text-sm font-black backdrop-blur transition hover:bg-muted">
               View rankings
-            </a>
+            </Link>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-          <div className="overflow-hidden rounded-3xl border border-border bg-background shadow-lg">
+          <Link href="/student-journey" className="overflow-hidden rounded-3xl border border-border bg-background shadow-lg transition hover:bg-muted">
             <img
               src="/student-journey-campus.svg"
               alt="Students walking on a modern academic campus"
@@ -52,7 +54,7 @@ export default function AcademicNetworkHero() {
               <p className="text-xs font-black uppercase tracking-wide text-primary">Student Journey</p>
               <p className="mt-1 text-sm font-bold">Track accepted schools, scholarships, internships, and milestones.</p>
             </div>
-          </div>
+          </Link>
 
           <div className="overflow-hidden rounded-3xl border border-border bg-background shadow-lg">
             <img

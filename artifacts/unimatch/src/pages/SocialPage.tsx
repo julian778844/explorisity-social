@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, Plus, Send, Users, Briefcase, CalendarDays, Megaphone, UserPlus, UserMinus } from "lucide-react";
+import { MessageCircle, Plus, Send, Users, UserPlus, UserMinus } from "lucide-react";
 import { api, type ApiUser, type Conversation, type SocialPost } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -9,13 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-
-const categoryIcon: Record<SocialPost["category"], typeof Megaphone> = {
-  promotion: Megaphone,
-  job: Briefcase,
-  event: CalendarDays,
-  general: MessageCircle,
-};
+import PostCard from "@/components/PostCard";
+import UserAvatar from "@/components/UserAvatar";
 
 export default function SocialPage() {
   const { user, openSignIn } = useAuth();
@@ -158,15 +154,13 @@ export default function SocialPage() {
               const following = followedUserIds.has(student.id);
               return (
                 <div key={student.id} className="rounded-xl border border-border p-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black" style={{ backgroundColor: student.avatarColor }}>
-                      {student.displayName.charAt(0).toUpperCase()}
-                    </div>
+                  <Link href={`/profile/${student.username}`} className="flex items-center gap-3 min-w-0 rounded-xl -m-2 p-2 transition hover:bg-muted">
+                    <UserAvatar user={student} size="sm" />
                     <div className="min-w-0">
                       <div className="font-bold truncate">{student.displayName}</div>
                       <div className="text-xs text-muted-foreground truncate">@{student.username}</div>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex gap-2">
                     <Button size="sm" variant={following ? "secondary" : "outline"} onClick={() => followUser.mutate({ id: student.id, following })}>
                       {following ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
@@ -221,21 +215,10 @@ export default function SocialPage() {
           <CardTitle>Student feed</CardTitle>
           <CardDescription>Promotions, jobs, events, and school updates.</CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-4">
-          {(postsQuery.data ?? []).map((post) => {
-            const Icon = categoryIcon[post.category];
-            return (
-              <article key={post.id} className="rounded-2xl border border-border p-4 bg-background/70">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="gap-1"><Icon className="w-3 h-3" /> {post.category}</Badge>
-                  <span className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</span>
-                </div>
-                <h3 className="font-black text-lg">{post.title}</h3>
-                <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">{post.body}</p>
-                {post.url && <a href={post.url} target="_blank" rel="noreferrer" className="text-sm text-primary font-bold mt-3 inline-block">Open link</a>}
-              </article>
-            );
-          })}
+        <CardContent className="space-y-4">
+          {(postsQuery.data ?? []).map((post) => (
+            <PostCard key={post.id} post={post} canEdit={user?.id === post.authorId} />
+          ))}
           {!postsQuery.data?.length && <p className="text-sm text-muted-foreground">No posts yet. Be the first to post.</p>}
         </CardContent>
       </Card>

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Briefcase, MessageCircle, Plus } from "lucide-react";
@@ -5,26 +6,78 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import EasyPostWidget from "@/components/EasyPostWidget";
 import PostCard from "@/components/PostCard";
+import FeedSkeleton from "@/components/FeedSkeleton";
+import NewPostsPill from "@/components/NewPostsPill";
+
+const PAGE_SIZE = 8;
 
 export default function ExplorePage() {
   const { user, openSignIn } = useAuth();
   const params = new URLSearchParams(useSearch());
   const filter = params.get("filter");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [latestSeenId, setLatestSeenId] = useState<number | null>(null);
+  const [newPostCount, setNewPostCount] = useState(0);
 
   const postsQuery = useQuery({
     queryKey: ["posts"],
     queryFn: async () => (await api.listPosts()).posts,
+    refetchInterval: 20_000,
   });
 
-  const posts = (postsQuery.data ?? []).filter((post) =>
-    filter === "opportunities"
-      ? ["job", "event", "promotion"].includes(post.category)
-      : true,
-  );
+  const filteredPosts = useMemo(() => {
+    const posts = postsQuery.data ?? [];
+    return posts.filter((post) =>
+      filter === "opportunities"
+        ? ["job", "event", "promotion"].includes(post.category)
+        : true,
+    );
+  }, [filter, postsQuery.data]);
+
+  const visiblePosts = filteredPosts.slice(0, visibleCount);
+
+  useEffect(() => {
+    if (!filteredPosts.length) return;
+    const newestId = filteredPosts[0].id;
+    if (latestSeenId === null) {
+      setLatestSeenId(newestId);
+      return;
+    }
+    if (newestId !== latestSeenId && window.scrollY > 360) {
+      const index = filteredPosts.findIndex((post) => post.id === latestSeenId);
+      setNewPostCount(index > 0 ? index : 1);
+    } else {
+      setLatestSeenId(newestId);
+    }
+  }, [filteredPosts, latestSeenId]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        setVisibleCount((current) => Math.min(current + PAGE_SIZE, filteredPosts.length));
+      }
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [filteredPosts.length]);
+
+  function jumpToNewPosts() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setLatestSeenId(filteredPosts[0]?.id ?? null);
+    setNewPostCount(0);
+    postsQuery.refetch();
+  }
 
   return (
     <div className="mx-auto min-h-screen max-w-3xl px-4 py-8">
-      <section className="mb-6 rounded-3xl border border-border bg-card p-6 shadow-sm">
+      <NewPostsPill show={newPostCount > 0} count={newPostCount} onClick={jumpToNewPosts} />
+
+      <section className="glass-card mb-6 rounded-3xl border border-border p-6 shadow-sm">
         <p className="text-sm font-black uppercase tracking-[0.22em] text-primary">Explore</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">
           Real student posts and opportunities.
@@ -58,14 +111,10 @@ export default function ExplorePage() {
         <EasyPostWidget compact />
       </div>
 
-      {postsQuery.isLoading && (
-        <div className="rounded-3xl border border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
-          Loading posts...
-        </div>
-      )}
+      {postsQuery.isLoading && <FeedSkeleton count={3} />}
 
-      {!postsQuery.isLoading && posts.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center shadow-sm">
+      {!postsQuery.isLoading && filteredPosts.length === 0 && (
+        <div className="glass-card rounded-3xl border border-dashed border-border p-10 text-center shadow-sm">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
             <MessageCircle className="h-7 w-7 text-muted-foreground" />
           </div>
@@ -75,10 +124,16 @@ export default function ExplorePage() {
       )}
 
       <div className="space-y-4">
-        {posts.map((post) => (
+        {visiblePosts.map((post) => (
           <PostCard key={post.id} post={post} canEdit={user?.id === post.authorId} />
         ))}
       </div>
+
+      <div ref={sentinelRef} className="h-16" />
+
+      {!postsQuery.isLoading && visiblePosts.length < filteredPosts.length && (
+        <p className="pb-8 text-center text-sm font-semibold text-muted-foreground">Loading more posts...</p>
+      )}
     </div>
   );
 }

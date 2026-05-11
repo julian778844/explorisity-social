@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import Logo, { LogoMark, Wordmark } from "@/components/Logo";
 import GlobalSearch from "@/components/GlobalSearch";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", icon: Compass, group: "Browse" },
@@ -65,7 +66,7 @@ export default function Nav() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/85 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
+      <nav className="glass-nav sticky top-0 z-50 w-full border-b border-border/60">
         <div className="container mx-auto flex min-h-16 items-center gap-3 px-4 py-2">
           <button
             onClick={() => setMenuOpen(true)}
@@ -87,6 +88,7 @@ export default function Nav() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <Link
               href="/search"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card md:hidden"

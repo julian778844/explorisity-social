@@ -1,15 +1,27 @@
 import { Link, useParams } from "wouter";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, UserPlus, UserMinus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
+import FollowerToolsModal from "@/components/FollowerToolsModal";
 
 function Avatar({ src, name, color }: { src?: string | null; name: string; color: string }) {
   if (src) return <img src={src} alt={name} className="h-24 w-24 rounded-3xl object-cover shadow-xl" />;
   return (
     <div className="flex h-24 w-24 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl" style={{ backgroundColor: color }}>
       {name.slice(0, 1).toUpperCase()}
+    {followerModal && (
+        <FollowerToolsModal
+          open={!!followerModal}
+          onClose={() => setFollowerModal(null)}
+          profileUserId={profile.user.id}
+          profileUsername={profile.user.username}
+          initialMode={followerModal}
+          isOwnProfile={isOwnProfile}
+        />
+      )}
     </div>
   );
 }
@@ -19,11 +31,13 @@ export default function PublicProfilePage() {
   const username = params.username?.replace(/^@+/, "") ?? "";
   const { user, openSignIn } = useAuth();
   const qc = useQueryClient();
+  const [followerModal, setFollowerModal] = useState<"followers" | "following" | null>(null);
 
   const profileQuery = useQuery({
     queryKey: ["public-profile", username],
     queryFn: () => api.getUserProfile(username),
     enabled: !!username,
+    refetchInterval: 12_000,
   });
 
   const followMutation = useMutation({
@@ -84,14 +98,14 @@ export default function PublicProfilePage() {
               {profile.user.bio && <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{profile.user.bio}</p>}
 
               <div className="mt-4 flex flex-wrap gap-3">
-                <div className="rounded-2xl bg-background px-4 py-3">
+                <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
                   <p className="text-xl font-black">{profile.followerCount}</p>
                   <p className="text-xs font-bold text-muted-foreground">Followers</p>
-                </div>
-                <div className="rounded-2xl bg-background px-4 py-3">
+                </button>
+                <button onClick={() => setFollowerModal("following")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
                   <p className="text-xl font-black">{profile.followingCount}</p>
                   <p className="text-xs font-bold text-muted-foreground">Following</p>
-                </div>
+                </button>
                 <div className="rounded-2xl bg-background px-4 py-3">
                   <p className="text-xl font-black">{profile.posts.length}</p>
                   <p className="text-xs font-bold text-muted-foreground">Posts</p>
@@ -127,6 +141,16 @@ export default function PublicProfilePage() {
           <PostCard key={post.id} post={post} canEdit={isOwnProfile} />
         ))}
       </section>
+    {followerModal && (
+        <FollowerToolsModal
+          open={!!followerModal}
+          onClose={() => setFollowerModal(null)}
+          profileUserId={profile.user.id}
+          profileUsername={profile.user.username}
+          initialMode={followerModal}
+          isOwnProfile={isOwnProfile}
+        />
+      )}
     </div>
   );
 }

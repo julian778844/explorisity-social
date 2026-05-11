@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import EasyPostWidget from "@/components/EasyPostWidget";
 import PostCard from "@/components/PostCard";
+import FollowerToolsModal from "@/components/FollowerToolsModal";
+import FollowerMilestoneBadge from "@/components/FollowerMilestoneBadge";
 
 const MAX_AVATAR_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -16,6 +18,17 @@ function AvatarDisplay({ src, name, color }: { src?: string | null; name: string
   return (
     <div className="flex h-28 w-28 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl" style={{ backgroundColor: color }}>
       {name.slice(0, 1).toUpperCase()}
+    {user && <FollowerMilestoneBadge followerCount={profile?.followerCount ?? 0} />}
+      {user && followerModal && (
+        <FollowerToolsModal
+          open={!!followerModal}
+          onClose={() => setFollowerModal(null)}
+          profileUserId={user.id}
+          profileUsername={user.username}
+          initialMode={followerModal}
+          isOwnProfile
+        />
+      )}
     </div>
   );
 }
@@ -27,6 +40,7 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [followerModal, setFollowerModal] = useState<"followers" | "following" | null>(null);
   const [draft, setDraft] = useState({
     displayName: "",
     bio: "",
@@ -51,6 +65,7 @@ export default function ProfilePage() {
     queryKey: ["profile", user?.username],
     queryFn: async () => api.getUserProfile(user!.username),
     enabled: !!user,
+    refetchInterval: 12_000,
   });
 
   const updateMutation = useMutation({
@@ -188,14 +203,14 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
-                  <div className="rounded-2xl bg-background px-4 py-3">
+                  <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
                     <p className="text-xl font-black">{profile?.followerCount ?? 0}</p>
                     <p className="text-xs font-bold text-muted-foreground">Followers</p>
-                  </div>
-                  <div className="rounded-2xl bg-background px-4 py-3">
+                  </button>
+                  <button onClick={() => setFollowerModal("following")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
                     <p className="text-xl font-black">{profile?.followingCount ?? 0}</p>
                     <p className="text-xs font-bold text-muted-foreground">Following</p>
-                  </div>
+                  </button>
                   <div className="rounded-2xl bg-background px-4 py-3">
                     <p className="text-xl font-black">{posts.length}</p>
                     <p className="text-xs font-bold text-muted-foreground">Posts</p>
@@ -230,6 +245,17 @@ export default function ProfilePage() {
           <PostCard key={post.id} post={post} canEdit />
         ))}
       </section>
+    {user && <FollowerMilestoneBadge followerCount={profile?.followerCount ?? 0} />}
+      {user && followerModal && (
+        <FollowerToolsModal
+          open={!!followerModal}
+          onClose={() => setFollowerModal(null)}
+          profileUserId={user.id}
+          profileUsername={user.username}
+          initialMode={followerModal}
+          isOwnProfile
+        />
+      )}
     </div>
   );
 }

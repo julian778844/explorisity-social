@@ -67,6 +67,29 @@ export type PostComment = {
   author?: PostAuthor | null;
 };
 
+
+export type FollowerProfileItem = Pick<
+  ApiUser,
+  "id" | "username" | "displayName" | "bio" | "avatarColor" | "avatarUrl"
+> & {
+  followerCount: number;
+  followingCount: number;
+  isMutual: boolean;
+  isNewFollower: boolean;
+  followingByMe: boolean;
+  canFollowBack: boolean;
+};
+
+export type FollowListResponse = {
+  users: FollowerProfileItem[];
+  canView: boolean;
+};
+
+export type FollowSuggestion = FollowerProfileItem & {
+  reason: string;
+  mutualCount: number;
+};
+
 export type UserProfileResponse = {
   user: ApiUser;
   followerCount: number;
@@ -224,6 +247,28 @@ export const api = {
 
   getUserProfile: (username: string) =>
     request<UserProfileResponse>(`/social/users/${encodeURIComponent(username.replace(/^@+/, ""))}/profile`),
+
+
+getFollowers: (userId: number) =>
+  request<FollowListResponse>(`/social/users/${userId}/followers`),
+
+getFollowing: (userId: number) =>
+  request<FollowListResponse>(`/social/users/${userId}/following`),
+
+getFollowSuggestions: () =>
+  request<{ suggestions: FollowSuggestion[] }>("/social/suggestions"),
+
+removeFollower: (userId: number) =>
+  request<{ ok: true }>(`/social/users/${userId}/remove-follower`, { method: "DELETE" }),
+
+updateFollowPrivacy: (b: { showFollowers: boolean; showFollowing: boolean }) =>
+  request<{ ok: true }>("/social/me/follow-privacy", { method: "PATCH", body: JSON.stringify(b) }),
+
+updatePinnedFollowers: (pinnedFollowerIds: number[]) =>
+  request<{ ok: true; pinnedFollowerIds: number[] }>("/social/me/pinned-followers", {
+    method: "PATCH",
+    body: JSON.stringify({ pinnedFollowerIds }),
+  }),
 
   listCommunities: () => request<{ communities: Community[] }>("/social/communities"),
   createCommunity: (b: { schoolType: string; schoolId: string; name: string; description?: string }) =>

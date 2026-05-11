@@ -496,4 +496,250 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
   res.status(201).json({ message: { ...message, createdAt: message.createdAt.toISOString() } });
 });
 
+
+function serializeFollowerToolUser(row: any) {
+  return {
+    id: Number(row.id),
+    username: row.username,
+    displayName: row.displayName ?? row.display_name ?? row.username,
+    bio: row.bio ?? null,
+    avatarColor: row.avatarColor ?? row.avatar_color ?? "#7c3aed",
+    avatarUrl: row.avatarUrl ?? row.avatar_url ?? null,
+    followerCount: Number(row.followerCount ?? 0),
+    followingCount: Number(row.followingCount ?? 0),
+    isMutual: Boolean(row.isMutual ?? false),
+    isNewFollower: Boolean(row.isNewFollower ?? false),
+    followingByMe: Boolean(row.followingByMe ?? false),
+    canFollowBack: Boolean(row.canFollowBack ?? false),
+  };
+}
+
+router.get("/users/:id/followers", async (req, res) => {
+  const profileUserId = Number(req.params.id);
+  const currentUserId = req.session?.userId ?? 0;
+
+  if (!Number.isInteger(profileUserId) || profileUserId <= 0) {
+    return res.status(400).json({ error: "Invalid user." });
+  }
+
+  const privacy = await pool.query(
+    "SELECT show_followers FROM users WHERE id = $1 LIMIT 1",
+    [profileUserId],
+  );
+
+  if (!privacy.rows[0]) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  const canView = Boolean(privacy.rows[0].show_followers) || currentUserId === profileUserId;
+
+  if (!canView) {
+    return res.json({ users: [], canView: false });
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        u.id,
+        u.username,
+        u.display_name AS "displayName",
+        u.bio,
+        u.avatar_color AS "avatarColor",
+        u.avatar_url AS "avatarUrl",
+        (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id)::int AS "followerCount",
+        (SELECT COUNT(*) FROM user_follows uf WHERE uf.follower_id = u.id)::int AS "followingCount",
+        EXISTS (
+          SELECT 1 FROM user_follows a
+          JOIN user_follows b ON b.follower_id = a.following_id AND b.following_id = a.follower_id
+          WHERE a.follower_id = $2 AND a.following_id = u.id
+        ) AS "isMutual",
+        (uf.created_at >= NOW() - INTERVAL '48 hours') AS "isNewFollower",
+        EXISTS (
+          SELECT 1 FROM user_follows mine
+          WHERE mine.follower_id = $2 AND mine.following_id = u.id
+        ) AS "followingByMe",
+        (
+          $2 = $1
+          AND u.id <> $2
+          AND EXISTS (
+            SELECT 1 FROM user_follows they_follow_me
+            WHERE they_follow_me.follower_id = u.id AND they_follow_me.following_id = $2
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM user_follows i_follow_them
+            WHERE i_follow_them.follower_id = $2 AND i_follow_them.following_id = u.id
+          )
+        ) AS "canFollowBack"
+      FROM user_follows uf
+      JOIN users u ON u.id = uf.follower_id
+      WHERE uf.following_id = $1
+      ORDER BY uf.created_at DESC
+      LIMIT 250
+    `,
+    [profileUserId, currentUserId],
+  );
+
+  return res.json({
+    users: result.rows.map(serializeFollowerToolUser),
+    canView: true,
+  });
+});
+
+router.get("/users/:id/following", async (req, res) => {
+  const profileUserId = Number(req.params.id);
+  const currentUserId = req.session?.userId ?? 0;
+
+  if (!Number.isInteger(profileUserId) || profileUserId <= 0) {
+    return res.status(400).json({ error: "Invalid user." });
+  }
+
+  const privacy = await pool.query(
+    "SELECT show_following FROM users WHERE id = $1 LIMIT 1",
+    [profileUserId],
+  );
+
+  if (!privacy.rows[0]) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  const canView = Boolean(privacy.rows[0].show_following) || currentUserId === profileUserId;
+
+  if (!canView) {
+    return res.json({ users: [], canView: false });
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        u.id,
+        u.username,
+        u.display_name AS "displayName",
+        u.bio,
+        u.avatar_color AS "avatarColor",
+        u.avatar_url AS "avatarUrl",
+        (SELECT COUNT(*) FROM user_follows uf2 WHERE uf2.following_id = u.id)::int AS "followerCount",
+        (SELECT COUNT(*) FROM user_follows uf2 WHERE uf2.follower_id = u.id)::int AS "followingCount",
+        EXISTS (
+          SELECT 1 FROM user_follows mine
+          WHERE mine.follower_id = $2 AND mine.following_id = u.id
+        ) AS "followingByMe",
+        EXISTS (
+          SELECT 1 FROM user_follows a
+          JOIN user_follows b ON b.follower_id = a.following_id AND b.following_id = a.follower_id
+          WHERE a.follower_id = $2 AND a.following_id = u.id
+        ) AS "isMutual",
+        FALSE AS "isNewFollower",
+        FALSE AS "canFollowBack"
+      FROM user_follows uf
+      JOIN users u ON u.id = uf.following_id
+      WHERE uf.follower_id = $1
+      ORDER BY uf.created_at DESC
+      LIMIT 250
+    `,
+    [profileUserId, currentUserId],
+  );
+
+  return res.json({
+    users: result.rows.map(serializeFollowerToolUser),
+    canView: true,
+  });
+});
+
+router.get("/suggestions", requireAuth, async (req, res) => {
+  const currentUserId = req.session.userId!;
+
+  const result = await pool.query(
+    `
+      SELECT
+        u.id,
+        u.username,
+        u.display_name AS "displayName",
+        u.bio,
+        u.avatar_color AS "avatarColor",
+        u.avatar_url AS "avatarUrl",
+        (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id)::int AS "followerCount",
+        (SELECT COUNT(*) FROM user_follows uf WHERE uf.follower_id = u.id)::int AS "followingCount",
+        EXISTS (
+          SELECT 1 FROM user_follows mutual_a
+          JOIN user_follows mutual_b
+            ON mutual_b.follower_id = mutual_a.following_id
+           AND mutual_b.following_id = mutual_a.follower_id
+          WHERE mutual_a.follower_id = $1
+            AND mutual_a.following_id = u.id
+        ) AS "isMutual",
+        FALSE AS "isNewFollower",
+        FALSE AS "followingByMe",
+        FALSE AS "canFollowBack",
+        (
+          SELECT COUNT(*)
+          FROM user_follows mine
+          JOIN user_follows candidate
+            ON candidate.follower_id = mine.following_id
+           AND candidate.following_id = u.id
+          WHERE mine.follower_id = $1
+        )::int AS "mutualCount"
+      FROM users u
+      WHERE u.id <> $1
+        AND NOT EXISTS (
+          SELECT 1 FROM user_follows existing
+          WHERE existing.follower_id = $1 AND existing.following_id = u.id
+        )
+      ORDER BY "mutualCount" DESC, u.created_at DESC
+      LIMIT 12
+    `,
+    [currentUserId],
+  );
+
+  return res.json({
+    suggestions: result.rows.map((row) => ({
+      ...serializeFollowerToolUser(row),
+      mutualCount: Number(row.mutualCount ?? 0),
+      reason: Number(row.mutualCount ?? 0) > 0 ? `${row.mutualCount} mutual connection${Number(row.mutualCount) === 1 ? "" : "s"}` : "Active on Explorisity",
+    })),
+  });
+});
+
+router.delete("/users/:id/remove-follower", requireAuth, async (req, res) => {
+  const followerId = Number(req.params.id);
+
+  if (!Number.isInteger(followerId) || followerId <= 0) {
+    return res.status(400).json({ error: "Invalid follower." });
+  }
+
+  await pool.query(
+    "DELETE FROM user_follows WHERE follower_id = $1 AND following_id = $2",
+    [followerId, req.session.userId!],
+  );
+
+  return res.json({ ok: true });
+});
+
+router.patch("/me/follow-privacy", requireAuth, async (req, res) => {
+  const showFollowers = Boolean(req.body?.showFollowers);
+  const showFollowing = Boolean(req.body?.showFollowing);
+
+  await pool.query(
+    "UPDATE users SET show_followers = $1, show_following = $2 WHERE id = $3",
+    [showFollowers, showFollowing, req.session.userId!],
+  );
+
+  return res.json({ ok: true });
+});
+
+router.patch("/me/pinned-followers", requireAuth, async (req, res) => {
+  const incoming = Array.isArray(req.body?.pinnedFollowerIds) ? req.body.pinnedFollowerIds : [];
+  const pinnedFollowerIds = incoming
+    .map((id: unknown) => Number(id))
+    .filter((id: number) => Number.isInteger(id) && id > 0)
+    .slice(0, 6);
+
+  await pool.query(
+    "UPDATE users SET pinned_follower_ids = $1::jsonb WHERE id = $2",
+    [JSON.stringify(pinnedFollowerIds), req.session.userId!],
+  );
+
+  return res.json({ ok: true, pinnedFollowerIds });
+});
+
+
 export default router;

@@ -26,6 +26,7 @@ import ChanceMe from "@/pages/ChanceMe";
 import SearchPage from "@/pages/SearchPage";
 import ExplorePage from "@/pages/ExplorePage";
 import MessagesPage from "@/pages/MessagesPage";
+import NotificationsPage from "@/pages/NotificationsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/search" component={SearchPage} />
       <Route path="/explore" component={ExplorePage} />
       <Route path="/messages" component={MessagesPage} />
+      <Route path="/notifications" component={NotificationsPage} />
       <Route component={NotFound} />
     </Switch>
   );

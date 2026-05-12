@@ -11,6 +11,7 @@ import studentJourneyRouter from "./studentJourney";
 import academicBioRouter from "./academicBio";
 import socialRankingsRouter from "./socialRankings";
 import messagesRouter from "./messages";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use("/student-journey", studentJourneyRouter);
 router.use("/academic-bio", academicBioRouter);
 router.use("/social-rankings", socialRankingsRouter);
 router.use("/messages", messagesRouter);
+router.use("/notifications", notificationsRouter);
 
 export default router;

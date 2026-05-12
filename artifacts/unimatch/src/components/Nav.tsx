@@ -17,12 +17,14 @@ import {
   Users,
   Search as SearchIcon,
   MessageCircle,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import Logo, { LogoMark, Wordmark } from "@/components/Logo";
 import GlobalSearch from "@/components/GlobalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
+import NotificationBell from "@/components/NotificationBell";
 import { api } from "@/lib/api";
 
 const NAV_LINKS = [
@@ -38,6 +40,7 @@ const NAV_LINKS = [
   { href: "/trending", label: "Trending Matchups", icon: Compass, group: "Discover" },
   { href: "/social", label: "Social Communities", icon: Users, group: "Discover" },
   { href: "/messages", label: "Messages", icon: MessageCircle, group: "Discover" },
+  { href: "/notifications", label: "Notifications", icon: Bell, group: "Discover" },
   { href: "/chance-me", label: "Chance Me", icon: Compass, group: "Discover" },
   { href: "/ai-picks", label: "AI Picks", icon: Compass, group: "Discover" },
   { href: "/contact", label: "Contact Us", icon: Mail, group: "About" },
@@ -100,6 +103,7 @@ export default function Nav() {
 
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <NotificationBell />
             <Link
               href="/search"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card md:hidden"

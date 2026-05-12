@@ -186,6 +186,35 @@ async function createNotification({
     `,
     [userId, actorUserId, conversationId, type, preview.slice(0, 220)],
   );
+
+  try {
+    const actorResult = await pool.query(
+      "SELECT username, display_name, avatar_url FROM users WHERE id = $1 LIMIT 1",
+      [actorUserId]
+    );
+    const actor = actorResult.rows[0];
+    const isRequest = type === "message_request";
+
+    await pool.query(
+      `
+        INSERT INTO notifications
+          (user_id, actor_user_id, type, title, body, href, image_url)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [
+        userId,
+        actorUserId,
+        type,
+        isRequest ? "New message request" : "New message",
+        `${actor?.display_name ?? actor?.username ?? "Someone"}: ${preview.slice(0, 180)}`,
+        `/messages?conversation=${conversationId}`,
+        actor?.avatar_url ?? null,
+      ]
+    );
+  } catch (error) {
+    console.error("App notification insert failed:", error);
+  }
 }
 
 router.get("/summary", requireAuth, async (req, res) => {

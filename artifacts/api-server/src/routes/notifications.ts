@@ -45,23 +45,28 @@ export async function createNotification({
 }) {
   if (!userId) return;
 
-  await pool.query(
-    `
-      INSERT INTO notifications
-        (user_id, actor_user_id, type, title, body, href, image_url)
-      VALUES
-        ($1, $2, $3, $4, $5, $6, $7)
-    `,
-    [
-      userId,
-      actorUserId ?? null,
-      type,
-      title,
-      body ?? null,
-      href ?? null,
-      imageUrl ?? null,
-    ],
-  );
+  try {
+    await pool.query(
+      `
+        INSERT INTO notifications
+          (user_id, actor_user_id, type, title, body, href, image_url)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [
+        userId,
+        actorUserId ?? null,
+        type,
+        title,
+        body ?? null,
+        href ?? null,
+        imageUrl ?? null,
+      ],
+    );
+  } catch (error) {
+    // Notifications should never break the main user action.
+    console.error("Notification insert failed:", error);
+  }
 }
 
 router.get("/", requireAuth, async (req, res) => {

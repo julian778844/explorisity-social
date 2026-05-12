@@ -150,6 +150,29 @@ export type MessageSummary = {
   unreadTotal: number;
 };
 
+
+
+export type AppNotification = {
+  id: number;
+  userId: number;
+  actorUserId: number | null;
+  type: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  imageUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
+  actor: {
+    id: number;
+    username: string;
+    displayName: string;
+    avatarColor: string;
+    avatarUrl: string | null;
+  } | null;
+};
+
+
 export type UserFollow = {
   id: number;
   followingId: number;

@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Heart, MessageCircle, UserPlus } from "lucide-react";
 import { api, type AppNotification } from "@/lib/api";

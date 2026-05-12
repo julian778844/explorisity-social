@@ -1,300 +1,309 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Edit3, LogIn, Save, X } from "lucide-react";
-import { api } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { motion } from "framer-motion";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { universities } from "@/data/universities";
+import { lawSchools } from "@/data/lawSchools";
+import { mbaPrograms } from "@/data/mbaPrograms";
+import { medSchools } from "@/data/medSchools";
+import { tradeSchools } from "@/data/tradeSchools";
 import { useAuth } from "@/lib/auth";
-import EasyPostWidget from "@/components/EasyPostWidget";
-import PostCard from "@/components/PostCard";
-import FollowerToolsModal from "@/components/FollowerToolsModal";
-import FollowerMilestoneBadge from "@/components/FollowerMilestoneBadge";
+import { useFollows, type SchoolType } from "@/lib/follows";
+import { api } from "@/lib/api";
+import SchoolLogo from "@/components/SchoolLogo";
+import SocialLinks, { SOCIAL_PLATFORMS } from "@/components/SocialLinks";
+import type { SocialPlatform } from "@/lib/api";
+import { Mail, Edit3, Heart, LogIn, Save, X } from "lucide-react";
 
-const MAX_AVATAR_FILE_SIZE = 2 * 1024 * 1024;
+const AVATAR_COLORS = ["#7C3AED", "#06B6D4", "#EC4899", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#A855F7"];
 
-function AvatarDisplay({ src, name, color }: { src?: string | null; name: string; color: string }) {
-  if (src) {
-    return <img src={src} alt={name} className="h-28 w-28 rounded-3xl object-cover shadow-xl" />;
+type ResolvedSchool = {
+  type: SchoolType;
+  id: string;
+  name: string;
+  loc: string;
+  color: string;
+  href: string;
+  kind: string;
+};
+
+function resolveFollow(type: SchoolType, id: string): ResolvedSchool | null {
+  if (type === "undergrad") {
+    const u = universities.find((x) => x.id === id);
+    return u ? { type, id, name: u.name, loc: u.location, color: u.color, href: `/university/${u.id}`, kind: "Undergrad" } : null;
   }
-
-  return (
-    <div
-      className="flex h-28 w-28 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl"
-      style={{ backgroundColor: color }}
-    >
-      {name.slice(0, 1).toUpperCase()}
-    </div>
-  );
+  if (type === "law") {
+    const s = lawSchools.find((x) => x.id === id);
+    return s ? { type, id, name: s.name, loc: s.loc, color: s.color, href: `/school/law/${s.id}`, kind: "Law" } : null;
+  }
+  if (type === "mba") {
+    const s = mbaPrograms.find((x) => x.id === id);
+    return s ? { type, id, name: s.name, loc: s.loc, color: s.color, href: `/school/mba/${s.id}`, kind: "MBA" } : null;
+  }
+  if (type === "med") {
+    const s = medSchools.find((x) => x.id === id);
+    return s ? { type, id, name: s.name, loc: s.loc, color: s.color, href: `/school/med/${s.id}`, kind: "Med" } : null;
+  }
+  if (type === "trade") {
+    const s = tradeSchools.find((x) => x.id === id);
+    return s ? { type, id, name: s.name, loc: s.loc, color: s.color, href: `/school/trade/${s.id}`, kind: "Trade" } : null;
+  }
+  return null;
 }
 
 export default function ProfilePage() {
-  const { user, isPending, openSignIn } = useAuth();
+  const { user, openSignIn, isPending, signOut } = useAuth();
+  const { list: follows, toggle } = useFollows();
   const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const [editing, setEditing] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [followerModal, setFollowerModal] = useState<"followers" | "following" | null>(null);
-  const [draft, setDraft] = useState({
-    displayName: "",
-    bio: "",
-    email: "",
-    avatarColor: "#7c3aed",
-    avatarUrl: null as string | null,
+  const [draft, setDraft] = useState<{
+    displayName: string; bio: string; email: string; avatarColor: string;
+  } & Record<SocialPlatform, string>>({
+    displayName: "", bio: "", email: "", avatarColor: AVATAR_COLORS[0]!,
+    instagram: "", linkedin: "", facebook: "", twitter: "", tiktok: "", youtube: "",
   });
 
   useEffect(() => {
-    if (user) {
-      setDraft({
-        displayName: user.displayName,
-        bio: user.bio ?? "",
-        email: user.email ?? "",
-        avatarColor: user.avatarColor,
-        avatarUrl: user.avatarUrl,
-      });
-    }
+    if (user) setDraft({
+      displayName: user.displayName, bio: user.bio ?? "", email: user.email ?? "", avatarColor: user.avatarColor,
+      instagram: user.instagram ?? "", linkedin: user.linkedin ?? "", facebook: user.facebook ?? "",
+      twitter: user.twitter ?? "", tiktok: user.tiktok ?? "", youtube: user.youtube ?? "",
+    });
   }, [user]);
-
-  const profileQuery = useQuery({
-    queryKey: ["profile", user?.username],
-    queryFn: async () => api.getUserProfile(user!.username),
-    enabled: !!user,
-    refetchInterval: 12_000,
-  });
 
   const updateMutation = useMutation({
     mutationFn: api.updateProfile,
     onSuccess: (d) => {
       qc.setQueryData(["auth", "me"], d.user);
-      qc.invalidateQueries({ queryKey: ["profile"] });
       setEditing(false);
-      setAvatarError(null);
     },
   });
-
-  const uploadAvatarMutation = useMutation({
-    mutationFn: api.uploadAvatar,
-    onSuccess: (d) => {
-      qc.setQueryData(["auth", "me"], d.user);
-      qc.invalidateQueries({ queryKey: ["profile"] });
-      setDraft((current) => ({ ...current, avatarUrl: d.user.avatarUrl }));
-      setAvatarError(null);
-    },
-    onError: (e: Error) => setAvatarError(e.message),
-  });
-
-  function handleAvatarFile(file?: File) {
-    setAvatarError(null);
-    if (!file) return;
-
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      setAvatarError("Use a PNG, JPG, JPEG, or WEBP image.");
-      return;
-    }
-
-    if (file.size > MAX_AVATAR_FILE_SIZE) {
-      setAvatarError("Use an image under 2MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const avatarDataUrl = String(reader.result || "");
-      setDraft((current) => ({ ...current, avatarUrl: avatarDataUrl }));
-      uploadAvatarMutation.mutate(avatarDataUrl);
-    };
-    reader.onerror = () => setAvatarError("Could not read that image. Try another file.");
-    reader.readAsDataURL(file);
-  }
 
   if (isPending) {
-    return <div className="mx-auto min-h-screen max-w-md px-4 py-20 text-center text-muted-foreground">Loading profile...</div>;
+    return <div className="min-h-screen px-4 py-20 max-w-md mx-auto text-center text-muted-foreground">Loading…</div>;
   }
 
   if (!user) {
     return (
-      <div className="mx-auto min-h-screen max-w-md px-4 py-20">
+      <div className="min-h-screen px-4 py-20 max-w-md mx-auto">
         <div className="rounded-3xl border border-border bg-card p-8 text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg">
-            <LogIn className="h-8 w-8" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground mb-4 shadow-lg">
+            <LogIn className="w-8 h-8" />
           </div>
-          <h1 className="mb-2 text-3xl font-black">Sign in to Explorisity</h1>
-          <p className="mb-6 text-sm text-muted-foreground">
-            Create your student profile, post updates, and follow other students.
-          </p>
+          <h1 className="text-3xl font-black mb-2">Sign in to Explorisity</h1>
+          <p className="text-muted-foreground mb-6 text-sm">Username + password — your followed schools sync across every device you sign in on.</p>
           <div className="flex gap-2">
-            <button onClick={() => openSignIn("signin")} className="flex-1 rounded-xl bg-primary py-3 font-bold text-primary-foreground">
-              Sign In
-            </button>
-            <button onClick={() => openSignIn("signup")} className="flex-1 rounded-xl bg-muted py-3 font-bold text-foreground">
-              Create Account
-            </button>
+            <button
+              onClick={() => openSignIn("signin")}
+              className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover-elevate transition-all"
+              data-testid="button-open-signin"
+            >Sign In</button>
+            <button
+              onClick={() => openSignIn("signup")}
+              className="flex-1 py-3 rounded-xl bg-muted text-foreground font-bold hover-elevate transition-all"
+              data-testid="button-open-signup"
+            >Create Account</button>
           </div>
         </div>
       </div>
     );
   }
 
-  const profile = profileQuery.data;
-  const posts = profile?.posts ?? [];
+  const followedSchools = follows
+    .map((f) => resolveFollow(f.schoolType, f.schoolId))
+    .filter((s): s is ResolvedSchool => !!s);
 
   return (
-    <div className="mx-auto min-h-screen max-w-5xl px-4 py-10">
-      <section className="mb-6 rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-6 shadow-sm md:p-8">
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="relative">
-            <AvatarDisplay src={draft.avatarUrl} name={draft.displayName || user.username} color={draft.avatarColor} />
-
-            {editing && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg"
-                  aria-label="Upload profile picture"
-                >
-                  <Camera className="h-5 w-5" />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => handleAvatarFile(e.target.files?.[0])}
-                />
-              </>
-            )}
+    <div className="min-h-screen px-4 py-10 max-w-5xl mx-auto">
+      <div className="rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-8 mb-8">
+        <div className="flex items-start gap-6 flex-wrap">
+          <div
+            className="w-24 h-24 rounded-3xl flex items-center justify-center text-white text-4xl font-black flex-shrink-0 shadow-xl"
+            style={{ backgroundColor: editing ? draft.avatarColor : user.avatarColor }}
+          >
+            {(editing ? draft.displayName : user.displayName).charAt(0).toUpperCase() || "?"}
           </div>
 
-          <div className="min-w-[260px] flex-1">
-            {editing ? (
-              <div className="space-y-3">
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black hover:bg-muted">
-                  {uploadAvatarMutation.isPending ? "Uploading picture..." : "Upload profile picture"}
-                </button>
-                {avatarError && <p className="text-xs font-bold text-red-600">{avatarError}</p>}
-
-                <input
-                  value={draft.displayName}
-                  onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))}
-                  placeholder="Display name"
-                  className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-xl font-black"
-                />
-
-                <textarea
-                  value={draft.bio}
-                  onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
-                  placeholder="Bio"
-                  rows={3}
-                  className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
-                />
-
-                <input
-                  value={draft.email}
-                  onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
-                  placeholder="Email"
-                  type="email"
-                  className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
-                />
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      updateMutation.mutate({
-                        displayName: draft.displayName,
-                        bio: draft.bio || null,
-                        email: draft.email || null,
-                        avatarColor: draft.avatarColor,
-                        avatarUrl: draft.avatarUrl,
-                      })
-                    }
-                    disabled={updateMutation.isPending || uploadAvatarMutation.isPending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save
-                  </button>
-                  <button onClick={() => setEditing(false)} className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-black hover:bg-muted">
-                    <X className="h-4 w-4" />
-                    Cancel
-                  </button>
+          {editing ? (
+            <div className="flex-1 min-w-[260px] space-y-3">
+              <input
+                value={draft.displayName}
+                onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))}
+                placeholder="Display name"
+                className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:border-primary focus:outline-none font-bold text-xl"
+                data-testid="input-display-name"
+              />
+              <textarea
+                value={draft.bio}
+                onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
+                placeholder="Bio (e.g., Senior · CS major · UPenn '30 hopeful)"
+                rows={2}
+                className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:border-primary focus:outline-none text-sm"
+                data-testid="input-bio"
+              />
+              <input
+                value={draft.email}
+                onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+                placeholder="Email (optional)"
+                type="email"
+                className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:border-primary focus:outline-none text-sm"
+                data-testid="input-email"
+              />
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Avatar Color</div>
+                <div className="flex gap-2 flex-wrap">
+                  {AVATAR_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setDraft((d) => ({ ...d, avatarColor: c }))}
+                      className={`w-8 h-8 rounded-full transition-all ${draft.avatarColor === c ? "ring-2 ring-offset-2 ring-foreground scale-110" : ""}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Color ${c}`}
+                    />
+                  ))}
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h1 className="text-3xl font-black">{user.displayName}</h1>
-                    <p className="mt-1 text-sm font-bold text-muted-foreground">@{user.username}</p>
-                    {user.bio && <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-muted-foreground">{user.bio}</p>}
-                  </div>
-
-                  <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-black hover:bg-muted">
-                    <Edit3 className="h-4 w-4" />
-                    Edit Profile
-                  </button>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Social Profiles</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {SOCIAL_PLATFORMS.map(({ key, label, Icon, brand }) => (
+                    <label key={key} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border focus-within:border-primary transition-colors">
+                      <span
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-white flex-shrink-0"
+                        style={{ backgroundColor: brand }}
+                        aria-hidden
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        value={draft[key]}
+                        onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                        placeholder={label}
+                        className="flex-1 bg-transparent border-0 focus:outline-none text-sm min-w-0"
+                        data-testid={`input-social-${key}`}
+                      />
+                    </label>
+                  ))}
                 </div>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
-                    <p className="text-xl font-black">{profile?.followerCount ?? 0}</p>
-                    <p className="text-xs font-bold text-muted-foreground">Followers</p>
-                  </button>
-                  <button onClick={() => setFollowerModal("following")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
-                    <p className="text-xl font-black">{profile?.followingCount ?? 0}</p>
-                    <p className="text-xs font-bold text-muted-foreground">Following</p>
-                  </button>
-                  <div className="rounded-2xl bg-background px-4 py-3">
-                    <p className="text-xl font-black">{posts.length}</p>
-                    <p className="text-xs font-bold text-muted-foreground">Posts</p>
-                  </div>
+                <div className="text-[11px] text-muted-foreground mt-1.5">Username, @handle, or full URL — all work.</div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => updateMutation.mutate({
+                    displayName: draft.displayName,
+                    bio: draft.bio || null,
+                    email: draft.email || null,
+                    avatarColor: draft.avatarColor,
+                    instagram: draft.instagram || null,
+                    linkedin: draft.linkedin || null,
+                    facebook: draft.facebook || null,
+                    twitter: draft.twitter || null,
+                    tiktok: draft.tiktok || null,
+                    youtube: draft.youtube || null,
+                  })}
+                  disabled={updateMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover-elevate disabled:opacity-50"
+                  data-testid="button-save-profile"
+                >
+                  <Save className="w-4 h-4" /> {updateMutation.isPending ? "Saving…" : "Save"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-foreground font-bold text-sm hover-elevate"
+                >
+                  <X className="w-4 h-4" /> Cancel
+                </button>
+              </div>
+              {updateMutation.error && (
+                <div className="text-xs text-red-600">{(updateMutation.error as Error).message}</div>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 min-w-[260px]">
+              <h1 className="text-3xl font-black mb-1">{user.displayName}</h1>
+              <div className="text-sm text-muted-foreground mb-2">@{user.username} · joined {user.createdAt.slice(0, 10)}</div>
+              {user.bio && <p className="text-foreground mb-2">{user.bio}</p>}
+              {user.email && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Mail className="w-3.5 h-3.5" /> {user.email}
                 </div>
-              </>
-            )}
+              )}
+              <SocialLinks user={user} size="md" className="mt-3" />
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setEditing(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary font-bold text-sm hover-elevate" data-testid="button-edit-profile">
+                  <Edit3 className="w-4 h-4" /> Edit Profile
+                </button>
+                <button
+                  onClick={() => { if (confirm("Sign out?")) void signOut(); }}
+                  className="px-4 py-2 rounded-lg bg-muted text-foreground font-bold text-sm hover-elevate"
+                  data-testid="button-signout"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-6 flex-shrink-0">
+            <div className="text-center">
+              <div className="text-3xl font-black text-primary">{follows.length}</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Schools</div>
+            </div>
           </div>
         </div>
-      </section>
-
-      <div className="mb-6">
-        <EasyPostWidget />
       </div>
 
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-black">Your posts</h2>
-          <span className="text-sm font-bold text-muted-foreground">{posts.length} total</span>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-black flex items-center gap-2">
+            <Heart className="w-5 h-5 text-primary fill-current" /> Schools You Follow
+          </h2>
+          <span className="text-xs text-muted-foreground">{followedSchools.length}</span>
         </div>
 
-        {profileQuery.isLoading && (
-          <div className="rounded-3xl border border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
-            Loading your posts...
+        {followedSchools.length === 0 ? (
+          <div className="text-center py-12 rounded-2xl border border-border/60 bg-card text-muted-foreground">
+            <Heart className="w-8 h-8 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Not following any schools yet</p>
+            <div className="flex justify-center gap-2 mt-3 text-xs flex-wrap">
+              <Link href="/rankings" className="text-primary hover:underline">Undergrad →</Link>
+              <Link href="/law" className="text-primary hover:underline">Law →</Link>
+              <Link href="/med" className="text-primary hover:underline">Med →</Link>
+              <Link href="/mba" className="text-primary hover:underline">MBA →</Link>
+              <Link href="/trade" className="text-primary hover:underline">Trade →</Link>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {followedSchools.map((s, i) => (
+              <motion.div
+                key={`${s.type}-${s.id}`}
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.03 }}
+                className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-card group hover:border-primary/40 transition-colors"
+              >
+                <Link href={s.href} className="flex items-center gap-3 flex-1 min-w-0">
+                  <SchoolLogo id={s.id} name={s.name} color={s.color} size={40} rounded="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold truncate text-sm">{s.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{s.loc}</div>
+                  </div>
+                </Link>
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold flex-shrink-0">{s.kind}</span>
+                <button
+                  onClick={() => toggle(s.type, s.id)}
+                  className="p-2 rounded-lg text-primary hover:bg-primary/10 transition-all"
+                  data-testid={`unfollow-${s.id}`}
+                  aria-label="Unfollow"
+                >
+                  <Heart className="w-4 h-4 fill-current" />
+                </button>
+              </motion.div>
+            ))}
           </div>
         )}
-
-        {!profileQuery.isLoading && posts.length === 0 && (
-          <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
-            <h3 className="text-xl font-black">You have not posted anything yet.</h3>
-            <p className="mt-2 text-sm font-medium text-muted-foreground">
-              Use the post widget above to share your first update.
-            </p>
-          </div>
-        )}
-
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} canEdit />
-        ))}
-      </section>
-
-      <FollowerMilestoneBadge followerCount={profile?.followerCount ?? 0} />
-
-      {followerModal && (
-        <FollowerToolsModal
-          open={!!followerModal}
-          onClose={() => setFollowerModal(null)}
-          profileUserId={user.id}
-          profileUsername={user.username}
-          initialMode={followerModal}
-          isOwnProfile
-        />
-      )}
+      </div>
     </div>
   );
 }

@@ -62,7 +62,6 @@ export const updateProfileSchema = z.object({
   email: z.string().email().max(254).nullable().optional(),
   phone: z.string().max(32).nullable().optional(),
   avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  avatarUrl: z.string().max(3_000_000).nullable().optional(),
   instagram: socialHandleSchema,
   linkedin: socialHandleSchema,
   facebook: socialHandleSchema,

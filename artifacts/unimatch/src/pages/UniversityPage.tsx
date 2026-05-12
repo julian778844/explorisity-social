@@ -118,8 +118,6 @@ export default function UniversityPage() {
         images={heroPhotos}
         alt={`${uni.name} campus`}
         overlay="full"
-        fallbackTitle={uni.name}
-        fallbackColor={uni.color}
         className="rounded-3xl mb-4 h-52 md:h-64 border border-border"
       />
 

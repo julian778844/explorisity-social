@@ -21,13 +21,11 @@ import SchoolProfilePage from "@/pages/SchoolProfilePage";
 import ContactPage from "@/pages/ContactPage";
 import ProfilePage from "@/pages/ProfilePage";
 import PublicProfilePage from "@/pages/PublicProfilePage";
-import StudentJourneyPage from "@/pages/StudentJourneyPage";
-import NotificationsPage from "@/pages/NotificationsPage";
-import PostPage from "@/pages/PostPage";
 import SocialPage from "@/pages/SocialPage";
 import ChanceMe from "@/pages/ChanceMe";
 import SearchPage from "@/pages/SearchPage";
 import ExplorePage from "@/pages/ExplorePage";
+import MessagesPage from "@/pages/MessagesPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -50,14 +48,12 @@ function Router() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/profile/:username" component={PublicProfilePage} />
-      <Route path="/student-journey" component={StudentJourneyPage} />
-      <Route path="/notifications" component={NotificationsPage} />
-      <Route path="/post/:id" component={PostPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/social" component={SocialPage} />
       <Route path="/chance-me" component={ChanceMe} />
       <Route path="/search" component={SearchPage} />
       <Route path="/explore" component={ExplorePage} />
+      <Route path="/messages" component={MessagesPage} />
       <Route component={NotFound} />
     </Switch>
   );

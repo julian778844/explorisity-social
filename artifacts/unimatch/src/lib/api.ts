@@ -61,30 +61,10 @@ export type PostComment = {
   id: number;
   postId: number;
   userId: number;
-  parentCommentId: number | null;
   body: string;
   createdAt: string;
   updatedAt: string;
   author?: PostAuthor | null;
-};
-
-export type NotificationType = "follow" | "post_like" | "post_comment" | "comment_reply" | "mention";
-
-export type NotificationItem = {
-  id: number;
-  recipientId: number;
-  actorId: number;
-  type: NotificationType;
-  postId: number | null;
-  commentId: number | null;
-  readAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  actor?: PostAuthor | null;
-  postTitle?: string | null;
-  postPreview?: string | null;
-  commentPreview?: string | null;
-  href: string;
 };
 
 
@@ -133,6 +113,41 @@ export type Message = {
   senderId: number;
   body: string;
   createdAt: string;
+};
+
+
+export type MessageUser = Pick<ApiUser, "id" | "username" | "displayName" | "bio" | "avatarColor" | "avatarUrl">;
+
+export type DirectMessageConversation = {
+  id: number;
+  type: string;
+  name: string | null;
+  requestStatus: "pending" | "accepted" | "declined" | null;
+  requestId: number | null;
+  otherUser: MessageUser | null;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+  updatedAt: string | null;
+  unreadCount: number;
+  isRequest: boolean;
+};
+
+export type DirectMessage = {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  recipientUserId: number | null;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sender: PostAuthor | null;
+};
+
+export type MessageSummary = {
+  unreadInboxCount: number;
+  pendingRequestCount: number;
+  unreadTotal: number;
 };
 
 export type UserFollow = {
@@ -254,6 +269,41 @@ export const api = {
     >,
   ) => request<{ user: ApiUser }>("/auth/me", { method: "PATCH", body: JSON.stringify(b) }),
 
+
+getMessageSummary: () =>
+  request<MessageSummary>("/messages/summary"),
+
+listMessageConversations: (box: "inbox" | "requests" = "inbox", q = "") =>
+  request<{ conversations: DirectMessageConversation[] }>(
+    `/messages/conversations?box=${encodeURIComponent(box)}&q=${encodeURIComponent(q)}`
+  ),
+
+openDm: (recipientUserId: number) =>
+  request<{ conversation: DirectMessageConversation }>("/messages/dm", {
+    method: "POST",
+    body: JSON.stringify({ recipientUserId }),
+  }),
+
+listDirectMessages: (conversationId: number) =>
+  request<{ conversation: DirectMessageConversation | null; messages: DirectMessage[] }>(
+    `/messages/conversations/${conversationId}/messages`
+  ),
+
+sendDirectMessage: (conversationId: number, body: string) =>
+  request<{ message: DirectMessage }>(`/messages/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  }),
+
+markConversationRead: (conversationId: number) =>
+  request<{ ok: true }>(`/messages/conversations/${conversationId}/read`, { method: "POST" }),
+
+acceptMessageRequest: (requestId: number) =>
+  request<{ ok: true }>(`/messages/requests/${requestId}/accept`, { method: "POST" }),
+
+declineMessageRequest: (requestId: number) =>
+  request<{ ok: true }>(`/messages/requests/${requestId}/decline`, { method: "POST" }),
+
   listFollows: () => request<{ follows: FollowItem[] }>("/follows"),
   addFollow: (b: { schoolType: FollowItem["schoolType"]; schoolId: string }) =>
     request<{ ok: true }>("/follows", { method: "POST", body: JSON.stringify(b) }),
@@ -296,7 +346,6 @@ updatePinnedFollowers: (pinnedFollowerIds: number[]) =>
   joinCommunity: (id: number) => request<{ ok: true }>(`/social/communities/${id}/join`, { method: "POST" }),
 
   listPosts: () => request<{ posts: SocialPost[] }>("/social/posts"),
-  getPost: (id: number) => request<{ post: SocialPost }>(`/social/posts/${id}`),
 
   createPost: (b: { communityId?: number | null; category: SocialPost["category"]; title: string; body: string; url?: string | null; imageUrl?: string | null }) =>
     request<{ post: SocialPost }>("/social/posts", { method: "POST", body: JSON.stringify(b) }),
@@ -308,16 +357,8 @@ updatePinnedFollowers: (pinnedFollowerIds: number[]) =>
   unlikePost: (id: number) => request<{ ok: true }>(`/social/posts/${id}/like`, { method: "DELETE" }),
 
   listPostComments: (id: number) => request<{ comments: PostComment[] }>(`/social/posts/${id}/comments`),
-  createPostComment: (id: number, body: string, parentCommentId?: number | null) =>
-    request<{ comment: PostComment }>(`/social/posts/${id}/comments`, {
-      method: "POST",
-      body: JSON.stringify({ body, parentCommentId: parentCommentId ?? null }),
-    }),
-
-  listNotifications: () => request<{ notifications: NotificationItem[]; unreadCount: number }>("/social/notifications"),
-  getUnreadNotificationCount: () => request<{ unreadCount: number }>("/social/notifications/unread-count"),
-  markNotificationRead: (id: number) => request<{ ok: true }>(`/social/notifications/${id}/read`, { method: "POST" }),
-  markAllNotificationsRead: () => request<{ ok: true }>("/social/notifications/read-all", { method: "POST" }),
+  createPostComment: (id: number, body: string) =>
+    request<{ comment: PostComment }>(`/social/posts/${id}/comments`, { method: "POST", body: JSON.stringify({ body }) }),
 
   listConversations: () => request<{ conversations: Conversation[] }>("/social/conversations"),
   createDm: (recipientUserId: number) =>

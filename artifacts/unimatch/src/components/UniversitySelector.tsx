@@ -16,7 +16,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { universities } from "@/data/universities";
-import SchoolLogo from "@/components/SchoolLogo";
 
 interface UniversitySelectorProps {
   value: string;
@@ -39,21 +38,12 @@ export default function UniversitySelector({ value, onChange, placeholder = "Sel
           className="w-full justify-between bg-card border-border hover:bg-muted hover:text-foreground"
         >
           {selectedUni ? (
-            <div className="flex min-w-0 items-center gap-2">
-              <SchoolLogo
-                id={selectedUni.id}
-                name={selectedUni.name}
-                color={selectedUni.color}
-                size={28}
-                rounded="lg"
-                className="bg-background"
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: selectedUni.color }}
               />
-              <div className="min-w-0 text-left">
-                <div className="truncate text-sm font-black">{selectedUni.shortName}</div>
-                <div className="hidden truncate text-[11px] font-semibold text-muted-foreground sm:block">
-                  {selectedUni.location}
-                </div>
-              </div>
+              {selectedUni.shortName}
             </div>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -61,7 +51,7 @@ export default function UniversitySelector({ value, onChange, placeholder = "Sel
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(360px,calc(100vw-2rem))] p-0 bg-card/95 backdrop-blur-xl border-border">
+      <PopoverContent className="w-[300px] p-0 bg-card/95 backdrop-blur-xl border-border">
         <Command className="bg-transparent">
           <CommandInput placeholder="Search university..." className="border-none focus:ring-0" />
           <CommandList>
@@ -70,25 +60,18 @@ export default function UniversitySelector({ value, onChange, placeholder = "Sel
               {universities.map((uni) => (
                 <CommandItem
                   key={uni.id}
-                  value={`${uni.name} ${uni.shortName} ${uni.location}`}
+                  value={uni.name}
                   onSelect={() => {
                     onChange(uni.id);
                     setOpen(false);
                   }}
-                  className="cursor-pointer gap-3 px-3 py-3 aria-selected:bg-muted/50"
+                  className="cursor-pointer aria-selected:bg-muted/50"
                 >
-                  <SchoolLogo
-                    id={uni.id}
-                    name={uni.name}
-                    color={uni.color}
-                    size={38}
-                    rounded="lg"
-                    className="bg-background"
+                  <div 
+                    className="w-2 h-2 rounded-full mr-2" 
+                    style={{ backgroundColor: uni.color }}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black">{uni.name}</div>
-                    <div className="truncate text-xs font-semibold text-muted-foreground">{uni.location}</div>
-                  </div>
+                  {uni.name}
                   <Check
                     className={cn(
                       "ml-auto h-4 w-4 text-primary",

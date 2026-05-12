@@ -460,9 +460,8 @@ export const HERO_PHOTOS: Record<string, HeroPhoto[]> = {
     { url: `${W}/Chapin_Hall%2C_Williams_College_-_Williamstown%2C_Massachusetts.jpg?width=1280`, caption: "Chapin Hall" },
   ],
   amherst: [
-    { url: `${W}/Amherst_College_Main_Quad.jpg?width=1280`, caption: "Main Quad" },
-    { url: `${W}/Amherst_College_campus_-_LOC_4a11989a.jpg?width=1280`, caption: "Campus view" },
-    { url: `${W}/Jchap1.JPG?width=1280`, caption: "College Row" },
+    { url: `${W}/Federal_-_Amherst%2C_MA_-_Amherst_College_(North_College)_(2).jpg?width=1280`, caption: "North College" },
+    { url: `${W}/Greek_Revival_-_Amherst%2C_MA_-_Amherst_College_(Johnson_Chapel)_(4).jpg?width=1280`, caption: "Johnson Chapel" },
   ],
   swarthmore: [
     { url: `${W}/Swarthmore_Parrish_Hall.jpg?width=1280`, caption: "Parrish Hall" },
@@ -544,9 +543,10 @@ const GRAD_TO_PARENT: Record<string, string> = {
   "jones-mba": "rice", "carlson-mba": "wisconsin", "foster-mba": "uw",
 };
 
-// Campus-only reserve pool kept for legacy verification. School profile heroes
-// do not use it as a generic fallback because a real campus from another
-// institution is still an irrelevant school image.
+// Campus-only fallback pool. Used for any school not in HERO_PHOTOS (and whose grad-parent
+// is also missing). Every URL is a verified Wikimedia Commons photo of a real American
+// university campus — never random stock photos. Picked deterministically by id-hash so
+// each school always shows the same fallback.
 const CAMPUS_FALLBACK_POOL: string[] = [
   `${W}/University_of_Wisconsin%E2%80%93Madison_August_2022_09_(Bascom_Hall).jpg?width=1280`,
   `${W}/Old_Well_UNC.jpg?width=1280`,
@@ -565,6 +565,17 @@ const CAMPUS_FALLBACK_POOL: string[] = [
   `${W}/Dsg_UF_Century_Tower_20050507.jpg?width=1280`,
 ];
 
+// Tiny deterministic string hash (FNV-1a 32-bit) so every school always picks
+// the same fallback campus photo across renders.
+function hashId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h >>> 0;
+}
+
 export function getDomain(id: string): string | undefined {
   return SCHOOL_DOMAINS[id];
 }
@@ -580,19 +591,20 @@ export function getLogoUrl(id: string): string | undefined {
 }
 
 // Returns an ordered list of campus photos for a school. Famous schools have
-// multiple shots so the carousel can rotate; uncurated schools render the
-// branded fallback panel instead of another school's campus.
+// multiple shots so the carousel can rotate; uncurated schools get a single
+// deterministic pick from the campus-only fallback pool.
 export function getHeroPhotos(id: string): HeroPhoto[] {
   if (HERO_PHOTOS[id]?.length) return HERO_PHOTOS[id];
   const parent = GRAD_TO_PARENT[id];
   if (parent && HERO_PHOTOS[parent]?.length) return HERO_PHOTOS[parent];
-  return [];
+  const idx = hashId(id) % CAMPUS_FALLBACK_POOL.length;
+  return [CAMPUS_FALLBACK_POOL[idx]];
 }
 
 // Convenience for callers that only need a single photo URL (cards, share images, etc).
 export function getHeroPhoto(id: string): string {
   const first = getHeroPhotos(id)[0];
-  return typeof first === "string" ? first : first?.url ?? "";
+  return typeof first === "string" ? first : first.url;
 }
 
 export function hasCuratedPhoto(id: string): boolean {

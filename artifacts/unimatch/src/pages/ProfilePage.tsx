@@ -7,10 +7,23 @@ import EasyPostWidget from "@/components/EasyPostWidget";
 import PostCard from "@/components/PostCard";
 import FollowerToolsModal from "@/components/FollowerToolsModal";
 import FollowerMilestoneBadge from "@/components/FollowerMilestoneBadge";
-import UserAvatar from "@/components/UserAvatar";
-import SocialLinks from "@/components/SocialLinks";
 
 const MAX_AVATAR_FILE_SIZE = 2 * 1024 * 1024;
+
+function AvatarDisplay({ src, name, color }: { src?: string | null; name: string; color: string }) {
+  if (src) {
+    return <img src={src} alt={name} className="h-28 w-28 rounded-3xl object-cover shadow-xl" />;
+  }
+
+  return (
+    <div
+      className="flex h-28 w-28 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl"
+      style={{ backgroundColor: color }}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { user, isPending, openSignIn } = useAuth();
@@ -29,15 +42,15 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (!user) return;
-
-    setDraft({
-      displayName: user.displayName,
-      bio: user.bio ?? "",
-      email: user.email ?? "",
-      avatarColor: user.avatarColor,
-      avatarUrl: user.avatarUrl,
-    });
+    if (user) {
+      setDraft({
+        displayName: user.displayName,
+        bio: user.bio ?? "",
+        email: user.email ?? "",
+        avatarColor: user.avatarColor,
+        avatarUrl: user.avatarUrl,
+      });
+    }
   }, [user]);
 
   const profileQuery = useQuery({
@@ -55,7 +68,6 @@ export default function ProfilePage() {
       setEditing(false);
       setAvatarError(null);
     },
-    onError: (e: Error) => setAvatarError(e.message),
   });
 
   const uploadAvatarMutation = useMutation({
@@ -101,14 +113,20 @@ export default function ProfilePage() {
     return (
       <div className="mx-auto min-h-screen max-w-md px-4 py-20">
         <div className="rounded-3xl border border-border bg-card p-8 text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg">
             <LogIn className="h-8 w-8" />
           </div>
           <h1 className="mb-2 text-3xl font-black">Sign in to Explorisity</h1>
-          <p className="mb-6 text-sm text-muted-foreground">Create your student profile, post updates, and follow other students.</p>
+          <p className="mb-6 text-sm text-muted-foreground">
+            Create your student profile, post updates, and follow other students.
+          </p>
           <div className="flex gap-2">
-            <button onClick={() => openSignIn("signin")} className="flex-1 rounded-xl bg-primary py-3 font-bold text-primary-foreground">Sign In</button>
-            <button onClick={() => openSignIn("signup")} className="flex-1 rounded-xl bg-muted py-3 font-bold text-foreground">Create Account</button>
+            <button onClick={() => openSignIn("signin")} className="flex-1 rounded-xl bg-primary py-3 font-bold text-primary-foreground">
+              Sign In
+            </button>
+            <button onClick={() => openSignIn("signup")} className="flex-1 rounded-xl bg-muted py-3 font-bold text-foreground">
+              Create Account
+            </button>
           </div>
         </div>
       </div>
@@ -117,19 +135,13 @@ export default function ProfilePage() {
 
   const profile = profileQuery.data;
   const posts = profile?.posts ?? [];
-  const followerCount = profile?.followerCount ?? 0;
-  const followingCount = profile?.followingCount ?? 0;
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-10">
       <section className="mb-6 rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-6 shadow-sm md:p-8">
         <div className="flex flex-wrap items-start gap-6">
           <div className="relative">
-            <UserAvatar
-              user={{ displayName: draft.displayName || user.username, avatarColor: draft.avatarColor, avatarUrl: draft.avatarUrl }}
-              size="xl"
-              className="shadow-xl"
-            />
+            <AvatarDisplay src={draft.avatarUrl} name={draft.displayName || user.username} color={draft.avatarColor} />
 
             {editing && (
               <>
@@ -155,11 +167,7 @@ export default function ProfilePage() {
           <div className="min-w-[260px] flex-1">
             {editing ? (
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black hover:bg-muted"
-                >
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black hover:bg-muted">
                   {uploadAvatarMutation.isPending ? "Uploading picture..." : "Upload profile picture"}
                 </button>
                 {avatarError && <p className="text-xs font-bold text-red-600">{avatarError}</p>}
@@ -170,6 +178,7 @@ export default function ProfilePage() {
                   placeholder="Display name"
                   className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-xl font-black"
                 />
+
                 <textarea
                   value={draft.bio}
                   onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))}
@@ -177,6 +186,7 @@ export default function ProfilePage() {
                   rows={3}
                   className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
                 />
+
                 <input
                   value={draft.email}
                   onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
@@ -185,7 +195,7 @@ export default function ProfilePage() {
                   className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
                 />
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2">
                   <button
                     onClick={() =>
                       updateMutation.mutate({
@@ -196,7 +206,7 @@ export default function ProfilePage() {
                         avatarUrl: draft.avatarUrl,
                       })
                     }
-                    disabled={updateMutation.isPending || uploadAvatarMutation.isPending || !draft.displayName.trim()}
+                    disabled={updateMutation.isPending || uploadAvatarMutation.isPending}
                     className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
                   >
                     <Save className="h-4 w-4" />
@@ -214,12 +224,7 @@ export default function ProfilePage() {
                   <div>
                     <h1 className="text-3xl font-black">{user.displayName}</h1>
                     <p className="mt-1 text-sm font-bold text-muted-foreground">@{user.username}</p>
-                    {user.bio ? (
-                      <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-muted-foreground">{user.bio}</p>
-                    ) : (
-                      <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-muted-foreground">No bio yet.</p>
-                    )}
-                    <SocialLinks user={user} size="md" className="mt-4" />
+                    {user.bio && <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-muted-foreground">{user.bio}</p>}
                   </div>
 
                   <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-black hover:bg-muted">
@@ -230,11 +235,11 @@ export default function ProfilePage() {
 
                 <div className="mt-5 flex flex-wrap gap-3">
                   <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
-                    <p className="text-xl font-black">{followerCount}</p>
+                    <p className="text-xl font-black">{profile?.followerCount ?? 0}</p>
                     <p className="text-xs font-bold text-muted-foreground">Followers</p>
                   </button>
                   <button onClick={() => setFollowerModal("following")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
-                    <p className="text-xl font-black">{followingCount}</p>
+                    <p className="text-xl font-black">{profile?.followingCount ?? 0}</p>
                     <p className="text-xs font-bold text-muted-foreground">Following</p>
                   </button>
                   <div className="rounded-2xl bg-background px-4 py-3">
@@ -258,12 +263,18 @@ export default function ProfilePage() {
           <span className="text-sm font-bold text-muted-foreground">{posts.length} total</span>
         </div>
 
-        {profileQuery.isLoading && <div className="rounded-3xl border border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">Loading your posts...</div>}
+        {profileQuery.isLoading && (
+          <div className="rounded-3xl border border-border bg-card p-8 text-center text-sm font-bold text-muted-foreground">
+            Loading your posts...
+          </div>
+        )}
 
         {!profileQuery.isLoading && posts.length === 0 && (
           <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
             <h3 className="text-xl font-black">You have not posted anything yet.</h3>
-            <p className="mt-2 text-sm font-medium text-muted-foreground">Use the post widget above to share your first update.</p>
+            <p className="mt-2 text-sm font-medium text-muted-foreground">
+              Use the post widget above to share your first update.
+            </p>
           </div>
         )}
 
@@ -272,11 +283,11 @@ export default function ProfilePage() {
         ))}
       </section>
 
-      <FollowerMilestoneBadge followerCount={followerCount} />
+      <FollowerMilestoneBadge followerCount={profile?.followerCount ?? 0} />
 
       {followerModal && (
         <FollowerToolsModal
-          open
+          open={!!followerModal}
           onClose={() => setFollowerModal(null)}
           profileUserId={user.id}
           profileUsername={user.username}

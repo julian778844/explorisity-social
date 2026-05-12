@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   Menu,
@@ -15,15 +16,14 @@ import {
   Wrench,
   Users,
   Search as SearchIcon,
-  NotebookPen,
-  Bell,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import Logo, { LogoMark, Wordmark } from "@/components/Logo";
 import GlobalSearch from "@/components/GlobalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
-import NotificationsBell from "@/components/NotificationsBell";
+import { api } from "@/lib/api";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", icon: Compass, group: "Browse" },
@@ -36,9 +36,8 @@ const NAV_LINKS = [
   { href: "/mba", label: "MBA Program Rankings", icon: Briefcase, group: "Rankings" },
   { href: "/trade", label: "Trade & Technical", icon: Wrench, group: "Rankings" },
   { href: "/trending", label: "Trending Matchups", icon: Compass, group: "Discover" },
-  { href: "/student-journey", label: "Student Journey", icon: NotebookPen, group: "Discover" },
-  { href: "/notifications", label: "Notifications", icon: Bell, group: "Discover" },
   { href: "/social", label: "Social Communities", icon: Users, group: "Discover" },
+  { href: "/messages", label: "Messages", icon: MessageCircle, group: "Discover" },
   { href: "/chance-me", label: "Chance Me", icon: Compass, group: "Discover" },
   { href: "/ai-picks", label: "AI Picks", icon: Compass, group: "Discover" },
   { href: "/contact", label: "Contact Us", icon: Mail, group: "About" },
@@ -48,6 +47,13 @@ export default function Nav() {
   const [location, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, openSignIn, signOut } = useAuth();
+  const messageSummaryQuery = useQuery({
+    queryKey: ["message-summary"],
+    queryFn: api.getMessageSummary,
+    enabled: !!user,
+    refetchInterval: 12_000,
+  });
+  const unreadMessages = messageSummaryQuery.data?.unreadTotal ?? 0;
 
   useEffect(() => {
     setMenuOpen(false);
@@ -94,7 +100,6 @@ export default function Nav() {
 
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            <NotificationsBell />
             <Link
               href="/search"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card md:hidden"
@@ -102,6 +107,22 @@ export default function Nav() {
             >
               <SearchIcon className="h-4 w-4" />
             </Link>
+
+
+{user && (
+  <Link
+    href="/messages"
+    className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card transition hover:bg-muted"
+    aria-label="Messages"
+  >
+    <MessageCircle className="h-4 w-4" />
+    {unreadMessages > 0 && (
+      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-primary-foreground">
+        {unreadMessages > 99 ? "99+" : unreadMessages}
+      </span>
+    )}
+  </Link>
+)}
 
             {user ? (
               <Link
@@ -233,7 +254,23 @@ export default function Nav() {
 
               <div className="my-3 border-t border-border" />
 
-              {user ? (
+  
+{user && (
+  <Link
+    href="/messages"
+    className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card transition hover:bg-muted"
+    aria-label="Messages"
+  >
+    <MessageCircle className="h-4 w-4" />
+    {unreadMessages > 0 && (
+      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-black text-primary-foreground">
+        {unreadMessages > 99 ? "99+" : unreadMessages}
+      </span>
+    )}
+  </Link>
+)}
+
+            {user ? (
                 <button
                   onClick={async () => {
                     await signOut();

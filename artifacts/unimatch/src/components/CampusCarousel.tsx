@@ -10,8 +10,6 @@ interface CampusCarouselProps {
   intervalMs?: number;
   /** Optional dark gradient overlay so foreground text stays readable. */
   overlay?: "bottom" | "full" | "none";
-  fallbackTitle?: string;
-  fallbackColor?: string;
 }
 
 export default function CampusCarousel({
@@ -20,8 +18,6 @@ export default function CampusCarousel({
   className = "",
   intervalMs = 5500,
   overlay = "bottom",
-  fallbackTitle,
-  fallbackColor = "#7c3aed",
 }: CampusCarouselProps) {
   type Slide = { url: string; caption?: string };
   const slides = useMemo<Slide[]>(
@@ -105,20 +101,9 @@ export default function CampusCarousel({
   if (count === 0) {
     return (
       <div
-        className={`relative flex items-center justify-center overflow-hidden bg-muted ${className}`}
-        style={{
-          background:
-            `linear-gradient(135deg, ${fallbackColor}26, rgba(255,255,255,0.08)), radial-gradient(circle at top left, ${fallbackColor}44, transparent 58%)`,
-        }}
+        className={`relative bg-muted ${className}`}
         aria-label="No campus photo available"
-      >
-        {fallbackTitle && (
-          <div className="px-6 text-center">
-            <div className="mx-auto mb-3 h-1.5 w-20 rounded-full" style={{ backgroundColor: fallbackColor }} />
-            <p className="text-lg font-black text-foreground">{fallbackTitle}</p>
-          </div>
-        )}
-      </div>
+      />
     );
   }
 

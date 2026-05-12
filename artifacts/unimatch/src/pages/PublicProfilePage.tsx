@@ -1,20 +1,33 @@
-import { Link, useParams } from "wouter";
 import { useState } from "react";
+import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, MessageCircle, UserMinus, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 import FollowerToolsModal from "@/components/FollowerToolsModal";
-import UserAvatar from "@/components/UserAvatar";
-import SocialLinks from "@/components/SocialLinks";
+
+function Avatar({ src, name, color }: { src?: string | null; name: string; color: string }) {
+  if (src) return <img src={src} alt={name} className="h-24 w-24 rounded-3xl object-cover shadow-xl" />;
+
+  return (
+    <div
+      className="flex h-24 w-24 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-xl"
+      style={{ backgroundColor: color }}
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
 
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const username = params.username?.replace(/^@+/, "") ?? "";
   const { user, openSignIn } = useAuth();
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [followerModal, setFollowerModal] = useState<"followers" | "following" | null>(null);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   const profileQuery = useQuery({
     queryKey: ["public-profile", username],
@@ -30,7 +43,7 @@ export default function PublicProfilePage() {
         openSignIn("signin");
         return;
       }
-      if (!profile || profile.user.id === user.id) return;
+      if (!profile) return;
       return profile.isFollowing ? api.unfollowUser(profile.user.id) : api.followUser(profile.user.id);
     },
     onSuccess: () => {
@@ -39,6 +52,27 @@ export default function PublicProfilePage() {
       qc.invalidateQueries({ queryKey: ["social-users"] });
       qc.invalidateQueries({ queryKey: ["user-follows"] });
     },
+  });
+
+  const messageMutation = useMutation({
+    mutationFn: async () => {
+      const profile = profileQuery.data;
+      if (!user) {
+        openSignIn("signin");
+        return null;
+      }
+      if (!profile) return null;
+      if (profile.user.id === user.id) {
+        throw new Error("You cannot message yourself.");
+      }
+      return api.openDm(profile.user.id);
+    },
+    onSuccess: (data) => {
+      if (data?.conversation?.id) {
+        navigate(`/messages?conversation=${data.conversation.id}`);
+      }
+    },
+    onError: (e: Error) => setMessageError(e.message),
   });
 
   if (profileQuery.isLoading) {
@@ -74,16 +108,11 @@ export default function PublicProfilePage() {
       <section className="mb-6 rounded-3xl border border-border bg-card p-8 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="flex flex-wrap items-center gap-5">
-            <UserAvatar user={profile.user} size="xl" className="shadow-xl" />
+            <Avatar src={profile.user.avatarUrl} name={profile.user.displayName} color={profile.user.avatarColor} />
             <div>
               <h1 className="text-3xl font-black">{profile.user.displayName}</h1>
               <p className="mt-1 text-sm font-semibold text-muted-foreground">@{profile.user.username}</p>
-              {profile.user.bio ? (
-                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{profile.user.bio}</p>
-              ) : (
-                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">No bio yet.</p>
-              )}
-              <SocialLinks user={profile.user} size="md" className="mt-4" />
+              {profile.user.bio && <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">{profile.user.bio}</p>}
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <button onClick={() => setFollowerModal("followers")} className="rounded-2xl bg-background px-4 py-3 text-left transition hover:bg-muted">
@@ -103,20 +132,33 @@ export default function PublicProfilePage() {
           </div>
 
           {!isOwnProfile && (
-            <button
-              onClick={() => followMutation.mutate()}
-              disabled={followMutation.isPending}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-black disabled:opacity-60 ${
-                profile.isFollowing
-                  ? "border border-primary/30 bg-primary/10 text-primary"
-                  : "bg-primary text-primary-foreground"
-              }`}
-            >
-              {profile.isFollowing ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-              {profile.isFollowing ? "Following" : "Follow"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => followMutation.mutate()}
+                disabled={followMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-60"
+              >
+                {profile.isFollowing ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {profile.isFollowing ? "Unfollow" : "Follow"}
+              </button>
+
+              <button
+                onClick={() => messageMutation.mutate()}
+                disabled={messageMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm font-black hover:bg-muted disabled:opacity-60"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Message
+              </button>
+            </div>
           )}
         </div>
+
+        {messageError && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700">
+            {messageError}
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">
@@ -136,7 +178,7 @@ export default function PublicProfilePage() {
 
       {followerModal && (
         <FollowerToolsModal
-          open
+          open={!!followerModal}
           onClose={() => setFollowerModal(null)}
           profileUserId={profile.user.id}
           profileUsername={profile.user.username}

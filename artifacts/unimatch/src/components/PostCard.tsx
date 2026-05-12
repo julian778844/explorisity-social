@@ -1,47 +1,32 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Heart, MessageCircle, Pencil, Reply, Send, Share2, X } from "lucide-react";
-import { api, type PostComment, type SocialPost } from "@/lib/api";
+import { Heart, MessageCircle, Pencil, Send, Share2, X } from "lucide-react";
+import { api, type SocialPost } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatPostTime, wasPostEdited } from "@/lib/postTime";
 import FollowHoverCard from "@/components/FollowHoverCard";
-import UserAvatar from "@/components/UserAvatar";
 
-function PostImage({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
+function Avatar({ author }: { author?: SocialPost["author"] | null }) {
+  if (!author) return <div className="h-10 w-10 rounded-2xl bg-muted" />;
+
+  if (author.avatarUrl) {
+    return <img src={author.avatarUrl} alt={author.displayName} className="h-10 w-10 rounded-2xl object-cover" />;
+  }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      className="mt-4 max-h-[560px] w-full rounded-2xl border border-border object-cover"
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
+    <div className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-black text-white" style={{ backgroundColor: author.avatarColor }}>
+      {author.displayName.slice(0, 1).toUpperCase()}
+    </div>
   );
 }
 
-export default function PostCard({
-  post,
-  canEdit = false,
-  initialCommentsOpen = false,
-  highlightCommentId,
-}: {
-  post: SocialPost;
-  canEdit?: boolean;
-  initialCommentsOpen?: boolean;
-  highlightCommentId?: number | null;
-}) {
+export default function PostCard({ post, canEdit = false }: { post: SocialPost; canEdit?: boolean }) {
   const { user, openSignIn } = useAuth();
   const qc = useQueryClient();
 
-  const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [comment, setComment] = useState("");
-  const [replyTarget, setReplyTarget] = useState<PostComment | null>(null);
   const [editing, setEditing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [draft, setDraft] = useState({
@@ -53,21 +38,11 @@ export default function PostCard({
   });
   const [error, setError] = useState<string | null>(null);
 
-  const profileHref = post.author?.username ? `/profile/${post.author.username}` : "/profile";
-  const showEdit = canEdit || (user?.id === post.authorId);
-  const edited = wasPostEdited(post.createdAt, post.updatedAt);
-
   const commentsQuery = useQuery({
     queryKey: ["post-comments", post.id],
     queryFn: async () => (await api.listPostComments(post.id)).comments,
     enabled: commentsOpen,
   });
-
-  useEffect(() => {
-    if (!highlightCommentId || !commentsOpen || commentsQuery.isLoading) return;
-    const el = document.getElementById(`comment-${highlightCommentId}`);
-    el?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [commentsOpen, commentsQuery.data, commentsQuery.isLoading, highlightCommentId]);
 
   const likeMutation = useMutation({
     mutationFn: async () => {
@@ -78,7 +53,6 @@ export default function PostCard({
       qc.invalidateQueries({ queryKey: ["posts"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["public-profile"] });
-      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: () => openSignIn("signin"),
   });
@@ -86,30 +60,26 @@ export default function PostCard({
   const commentMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Sign in to comment.");
-      return api.createPostComment(post.id, comment.trim(), replyTarget?.id ?? null);
+      return api.createPostComment(post.id, comment.trim());
     },
     onSuccess: () => {
       setComment("");
-      setReplyTarget(null);
-      setError(null);
       qc.invalidateQueries({ queryKey: ["post-comments", post.id] });
       qc.invalidateQueries({ queryKey: ["posts"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["public-profile"] });
-      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (e: Error) => setError(e.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      api.updatePost(post.id, {
-        title: draft.title.trim(),
-        body: draft.body.trim(),
-        category: draft.category,
-        url: draft.url.trim() || null,
-        imageUrl: draft.imageUrl || null,
-      }),
+    mutationFn: () => api.updatePost(post.id, {
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      category: draft.category,
+      url: draft.url.trim() || null,
+      imageUrl: draft.imageUrl || null,
+    }),
     onSuccess: () => {
       setEditing(false);
       setError(null);
@@ -137,45 +107,40 @@ export default function PostCard({
   }
 
   async function sharePost() {
-    const url = `${window.location.origin}${profileHref}`;
+    const url = post.author?.username
+      ? `${window.location.origin}/profile/${post.author.username}`
+      : window.location.href;
 
     try {
       if (navigator.share) {
         await navigator.share({ title: post.title, text: post.body, url });
       } else {
         await navigator.clipboard.writeText(url);
-        setShareMessage("Profile link copied.");
+        setShareMessage("Post link copied.");
         window.setTimeout(() => setShareMessage(""), 1800);
       }
     } catch {}
   }
 
+  const showEdit = canEdit || (user && user.id === post.authorId);
+
   return (
-    <motion.article layout className="glass-card rounded-3xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <motion.article layout className="glass-card rounded-3xl border border-border p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <FollowHoverCard author={post.author}>
-          <Link href={profileHref} className="flex min-w-0 items-start gap-3 rounded-2xl -m-2 p-2 transition hover:bg-muted/70">
-            <UserAvatar user={post.author} size="md" />
+          <Link href={post.author?.username ? `/profile/${post.author.username}` : "/profile"} className="flex min-w-0 items-center gap-3">
+            <Avatar author={post.author} />
             <div className="min-w-0">
               <p className="truncate text-sm font-black">{post.author?.displayName ?? "Explorisity user"}</p>
-              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-muted-foreground">
-                <span className="truncate">@{post.author?.username ?? "user"}</span>
-                <span>{formatPostTime(post.createdAt)}</span>
-                {edited && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold">
-                    {formatPostTime(post.updatedAt, "Edited")}
-                  </span>
-                )}
-              </div>
+              <p className="truncate text-xs font-semibold text-muted-foreground">
+                @{post.author?.username ?? "user"} · {new Date(post.createdAt).toLocaleDateString()}
+              </p>
             </div>
           </Link>
         </FollowHoverCard>
 
         {showEdit && !editing && (
-          <button
-            onClick={() => setEditing(true)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-black transition hover:bg-muted"
-          >
+          <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-black hover:bg-muted">
             <Pencil className="h-3.5 w-3.5" />
             Edit
           </button>
@@ -184,54 +149,27 @@ export default function PostCard({
 
       {editing ? (
         <div className="space-y-3">
-          <select
-            value={draft.category}
-            onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value as SocialPost["category"] }))}
-            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-bold"
-          >
+          <select value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value as SocialPost["category"] }))} className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-bold">
             <option value="general">General</option>
             <option value="job">Job</option>
             <option value="event">Event</option>
             <option value="promotion">Promotion</option>
           </select>
 
-          <input
-            value={draft.title}
-            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-bold"
-          />
+          <input value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-bold" />
 
-          <textarea
-            value={draft.body}
-            onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-            rows={4}
-            className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
-          />
+          <textarea value={draft.body} onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))} rows={4} className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium" />
 
-          <input
-            value={draft.url}
-            onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-            placeholder="Optional link"
-            className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
-          />
+          <input value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} placeholder="Optional link" className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium" />
 
-          <input
-            value={draft.imageUrl ?? ""}
-            onChange={(e) => setDraft((d) => ({ ...d, imageUrl: e.target.value || null }))}
-            placeholder="Image URL or uploaded image data"
-            className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium"
-          />
+          <input value={draft.imageUrl ?? ""} onChange={(e) => setDraft((d) => ({ ...d, imageUrl: e.target.value || null }))} placeholder="Image URL or uploaded image data" className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm font-medium" />
 
-          {draft.imageUrl && <PostImage src={draft.imageUrl} alt="Post preview" />}
+          {draft.imageUrl && <img src={draft.imageUrl} alt="Post preview" className="max-h-72 w-full rounded-2xl object-cover" />}
 
           {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700">{error}</div>}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => updateMutation.mutate()}
-              disabled={updateMutation.isPending || !draft.title.trim() || !draft.body.trim()}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
-            >
+          <div className="flex gap-2">
+            <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60">
               {updateMutation.isPending ? "Saving..." : "Save changes"}
             </button>
             <button onClick={() => setEditing(false)} className="inline-flex items-center gap-1 rounded-xl border border-border px-4 py-2 text-sm font-black hover:bg-muted">
@@ -243,20 +181,16 @@ export default function PostCard({
       ) : (
         <>
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black uppercase text-primary">{post.category}</span>
-          <h2 className="mt-3 text-xl font-black tracking-tight">{post.title}</h2>
+          <h2 className="mt-3 text-xl font-black">{post.title}</h2>
           <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-muted-foreground">{post.body}</p>
 
-          {post.imageUrl && <PostImage src={post.imageUrl} alt={post.title} />}
+          {post.imageUrl && (
+            <img src={post.imageUrl} alt={post.title} className="mt-4 max-h-[520px] w-full rounded-2xl object-cover" loading="lazy" />
+          )}
 
           {post.url && (
-            <a
-              href={post.url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-black text-primary transition hover:bg-muted"
-            >
+            <a href={post.url} target="_blank" rel="noreferrer" className="mt-4 inline-block rounded-xl border border-border px-4 py-2 text-sm font-black text-primary hover:bg-muted">
               Open link
-              <ExternalLink className="h-4 w-4" />
             </a>
           )}
 
@@ -286,27 +220,8 @@ export default function PostCard({
           {commentsOpen && (
             <div className="mt-4 space-y-3 rounded-2xl border border-border bg-background/70 p-4 backdrop-blur">
               <div className="flex gap-2">
-                <div className="min-w-0 flex-1">
-                  {replyTarget && (
-                    <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground">
-                      <span className="truncate">Replying to @{replyTarget.author?.username ?? "user"}</span>
-                      <button onClick={() => setReplyTarget(null)} className="rounded-lg p-1 hover:bg-muted" aria-label="Cancel reply">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  <input
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder={user ? "Write a comment..." : "Sign in to comment"}
-                    className="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium"
-                  />
-                </div>
-                <button
-                  onClick={submitComment}
-                  disabled={commentMutation.isPending}
-                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
-                >
+                <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={user ? "Write a comment..." : "Sign in to comment"} className="min-w-0 flex-1 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium" />
+                <button onClick={submitComment} disabled={commentMutation.isPending} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-60">
                   <Send className="h-4 w-4" />
                   Post
                 </button>
@@ -316,35 +231,16 @@ export default function PostCard({
               {commentsQuery.isLoading && <p className="text-sm font-semibold text-muted-foreground">Loading comments...</p>}
 
               {(commentsQuery.data ?? []).map((c) => (
-                <div
-                  id={`comment-${c.id}`}
-                  key={c.id}
-                  className={`flex gap-3 rounded-xl bg-card p-3 transition ${
-                    c.parentCommentId ? "ml-6 border-l-2 border-primary/25" : ""
-                  } ${highlightCommentId === c.id ? "ring-2 ring-primary/50" : ""}`}
-                >
+                <div key={c.id} className="flex gap-3 rounded-xl bg-card p-3">
                   <FollowHoverCard author={c.author}>
-                    <Link href={c.author?.username ? `/profile/${c.author.username}` : "/profile"} className="flex min-w-0 flex-1 gap-3">
-                      <UserAvatar user={c.author} size="sm" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black hover:underline">@{c.author?.username ?? "user"}</p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm font-medium text-muted-foreground">{c.body}</p>
+                    <Link href={c.author?.username ? `/profile/${c.author.username}` : "/profile"} className="flex gap-3">
+                      <Avatar author={c.author} />
+                      <div>
+                        <p className="text-sm font-black hover:underline">@{c.author?.username ?? "user"}</p>
+                        <p className="mt-1 text-sm font-medium text-muted-foreground">{c.body}</p>
                       </div>
                     </Link>
                   </FollowHoverCard>
-                  <button
-                    onClick={() => {
-                      if (!user) {
-                        openSignIn("signin");
-                        return;
-                      }
-                      setReplyTarget(c);
-                    }}
-                    className="ml-auto inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <Reply className="h-3.5 w-3.5" />
-                    Reply
-                  </button>
                 </div>
               ))}
 

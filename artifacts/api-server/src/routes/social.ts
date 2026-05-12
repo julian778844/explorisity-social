@@ -33,19 +33,21 @@ const communityInputSchema = z.object({
   description: z.string().max(1000).optional().nullable(),
 });
 
-const postInputSchema = z.object({
+const postBaseSchema = z.object({
   communityId: z.number().int().positive().optional().nullable(),
   category: z.enum(POST_CATEGORIES).default("general"),
   title: z.string().min(2).max(160),
   body: z.string().min(1).max(5000),
   url: z.string().url().max(500).optional().nullable(),
   imageUrl: z.string().max(MAX_IMAGE_DATA_URL_LENGTH).optional().nullable(),
-}).refine((data) => isSafeImageDataUrl(data.imageUrl), {
+});
+
+const postInputSchema = postBaseSchema.refine((data) => isSafeImageDataUrl(data.imageUrl), {
   message: "Image must be PNG, JPG, JPEG, or WEBP and under the size limit.",
   path: ["imageUrl"],
 });
 
-const postUpdateSchema = postInputSchema.partial().refine((data) => isSafeImageDataUrl(data.imageUrl), {
+const postUpdateSchema = postBaseSchema.partial().refine((data) => isSafeImageDataUrl(data.imageUrl), {
   message: "Image must be PNG, JPG, JPEG, or WEBP and under the size limit.",
   path: ["imageUrl"],
 });
